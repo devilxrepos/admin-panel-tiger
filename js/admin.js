@@ -7,7 +7,7 @@
 // Global variables
 let currentUser = null;
 const PACKAGE_NAME = "com.Tiger349x.hack.demo";
-const DB_NODE = "users"; // Changed from "license_keys" to "users" to match app
+const DB_NODE = "users";
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
