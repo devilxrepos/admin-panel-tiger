@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Tiger License Key Manager - Secure Admin Panel">
+    <meta name="description" content="Tiger License Key Manager - Admin Panel">
     <meta name="robots" content="noindex, nofollow">
     <title>Tiger Admin Panel - License Key Manager</title>
     
@@ -18,32 +18,10 @@
     
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/style.css">
-    
-    <!-- reCAPTCHA -->
-    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
-    
-    <style>
-        /* Critical CSS for initial load */
-        .loading-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #f8f9fa;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-        }
-        body.loaded .loading-screen {
-            display: none;
-        }
-    </style>
 </head>
-<body class="loading">
+<body>
     <!-- Loading Screen -->
-    <div class="loading-screen">
+    <div id="loadingScreen" class="loading-screen">
         <div class="text-center">
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Loading...</span>
@@ -56,20 +34,20 @@
     <div class="modal fade" id="loginModal" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg">
-                <div class="modal-header bg-gradient-primary text-white">
+                <div class="modal-header bg-primary text-white">
                     <h5 class="modal-title">
                         <i class="bi bi-shield-lock-fill me-2"></i>Admin Login
                     </h5>
                 </div>
                 <div class="modal-body p-4">
                     <!-- Login Attempt Warning -->
-                    <div id="loginAttemptWarning" class="alert alert-warning d-none">
+                    <div id="loginAttemptWarning" class="alert alert-warning" style="display: none;">
                         <i class="bi bi-exclamation-triangle-fill me-2"></i>
                         <span id="attemptMessage"></span>
                     </div>
                     
                     <!-- Error Message -->
-                    <div id="loginError" class="alert alert-danger d-none"></div>
+                    <div id="loginError" class="alert alert-danger" style="display: none;"></div>
                     
                     <form id="loginForm" autocomplete="off">
                         <div class="mb-3">
@@ -79,11 +57,11 @@
                                     <i class="bi bi-envelope-fill text-primary"></i>
                                 </span>
                                 <input type="email" class="form-control" id="email" 
-                                       placeholder="admin@example.com" required>
+                                       placeholder="admin@example.com" required autofocus>
                             </div>
                         </div>
                         
-                        <div class="mb-3">
+                        <div class="mb-4">
                             <label for="password" class="form-label fw-bold">Password</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light">
@@ -97,40 +75,14 @@
                             </div>
                         </div>
                         
-                        <!-- CAPTCHA -->
-                        <div class="mb-4">
-                            <label class="form-label fw-bold">Security Verification</label>
-                            <div class="captcha-wrapper p-2 bg-light rounded">
-                                <div class="g-recaptcha d-flex justify-content-center" 
-                                     data-sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
-                                     data-callback="onCaptchaSuccess"
-                                     data-expired-callback="onCaptchaExpired">
-                                </div>
-                            </div>
-                            <div id="captchaError" class="text-danger small mt-2 d-none">
-                                <i class="bi bi-exclamation-circle"></i> Please complete the CAPTCHA
-                            </div>
-                        </div>
-                        
-                        <!-- CAPTCHA Status -->
-                        <div id="captchaStatus" class="mb-3">
-                            <div class="alert alert-info small mb-0" id="captchaPending">
-                                <i class="bi bi-arrow-repeat me-1"></i> Verify you are human
-                            </div>
-                            <div class="alert alert-success small mb-0 d-none" id="captchaVerified">
-                                <i class="bi bi-check-circle me-1"></i> Verification successful
-                            </div>
-                        </div>
-                        
-                        <button type="submit" class="btn btn-primary btn-lg w-100" id="loginButton" disabled>
-                            <i class="bi bi-box-arrow-in-right me-2"></i>
-                            <span id="loginButtonText">Complete CAPTCHA to Login</span>
-                            <span id="loginSpinner" class="spinner-border spinner-border-sm ms-2 d-none"></span>
+                        <button type="submit" class="btn btn-primary btn-lg w-100" id="loginButton">
+                            <i class="bi bi-box-arrow-in-right me-2"></i>Login
+                            <span id="loginSpinner" class="spinner-border spinner-border-sm ms-2" style="display: none;"></span>
                         </button>
                         
                         <div class="text-center mt-3">
                             <small class="text-muted">
-                                <i class="bi bi-shield-check"></i> Secure login protected by reCAPTCHA
+                                <i class="bi bi-shield-check"></i> Secure admin access only
                             </small>
                         </div>
                     </form>
@@ -186,9 +138,6 @@
                         <a href="#" class="list-group-item list-group-item-action" data-section="stats">
                             <i class="bi bi-graph-up me-2"></i>Statistics
                         </a>
-                        <a href="#" class="list-group-item list-group-item-action" data-section="security">
-                            <i class="bi bi-shield-check me-2"></i>Security Logs
-                        </a>
                     </div>
                 </div>
 
@@ -228,7 +177,6 @@
                                             <option value="trial">Trial</option>
                                             <option value="premium">Premium</option>
                                             <option value="lifetime">Lifetime</option>
-                                            <option value="enterprise">Enterprise</option>
                                         </select>
                                     </div>
                                     <div class="col-md-2">
@@ -261,12 +209,6 @@
                                         </tbody>
                                     </table>
                                 </div>
-                                
-                                <!-- Pagination -->
-                                <div class="d-flex justify-content-between align-items-center mt-3">
-                                    <small class="text-muted" id="keysCount"></small>
-                                    <nav id="keysPagination"></nav>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -284,7 +226,6 @@
                                                 <option value="trial">Trial (7 Days)</option>
                                                 <option value="premium">Premium (30 Days)</option>
                                                 <option value="lifetime">Lifetime</option>
-                                                <option value="enterprise">Enterprise (1 Year)</option>
                                             </select>
                                         </div>
                                         <div class="col-md-2">
@@ -295,16 +236,7 @@
                                         <div class="col-md-3">
                                             <label class="form-label fw-bold">Custom Prefix (Optional)</label>
                                             <input type="text" class="form-control" id="keyPrefix" 
-                                                   placeholder="e.g., MYAPP">
-                                        </div>
-                                        <div class="col-md-2">
-                                            <label class="form-label fw-bold">Algorithm</label>
-                                            <select class="form-select" id="keyAlgorithm">
-                                                <option value="standard">Standard</option>
-                                                <option value="secure">Secure (Checksum)</option>
-                                                <option value="premium">Premium (Enhanced)</option>
-                                                <option value="encrypted">Encrypted</option>
-                                            </select>
+                                                   placeholder="e.g., TIGER">
                                         </div>
                                         <div class="col-md-2">
                                             <button type="submit" class="btn btn-success w-100">
@@ -373,65 +305,6 @@
                                 </div>
                             </div>
                         </div>
-                        
-                        <!-- Additional Stats -->
-                        <div class="row mt-3">
-                            <div class="col-md-6 mb-3">
-                                <div class="card shadow-sm h-100">
-                                    <div class="card-header bg-light">
-                                        <h5 class="mb-0">Key Distribution</h5>
-                                    </div>
-                                    <div class="card-body" id="keyDistribution">
-                                        <p class="text-center text-muted">Loading...</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <div class="card shadow-sm h-100">
-                                    <div class="card-header bg-light">
-                                        <h5 class="mb-0">Recent Activity</h5>
-                                    </div>
-                                    <div class="card-body" id="recentActivity">
-                                        <p class="text-center text-muted">Loading...</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Security Logs Section -->
-                    <div id="securitySection" class="content-section" style="display: none;">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h3 class="mb-0"><i class="bi bi-shield-check me-2"></i>Security Logs</h3>
-                            <button class="btn btn-outline-danger btn-sm" onclick="clearSecurityLogs()">
-                                <i class="bi bi-trash me-1"></i>Clear Logs
-                            </button>
-                        </div>
-                        <div class="card shadow-sm">
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-hover">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th>Timestamp</th>
-                                                <th>Event Type</th>
-                                                <th>IP Address</th>
-                                                <th>Details</th>
-                                                <th>User Agent</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="securityLogsBody">
-                                            <tr>
-                                                <td colspan="5" class="text-center py-4">
-                                                    <div class="spinner-border spinner-border-sm text-primary me-2"></div>
-                                                    Loading security logs...
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -451,7 +324,6 @@
     
     <!-- Custom JavaScript -->
     <script src="js/firebase-config.js"></script>
-    <script src="js/captcha.js"></script>
     <script src="js/key-generator.js"></script>
     <script src="js/admin.js"></script>
     
