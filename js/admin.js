@@ -1,292 +1,505 @@
+/**
+ * Tiger Admin Panel - Main JavaScript
+ * Simple Login System
+ */
+
 // Global variables
 let currentUser = null;
 const PACKAGE_NAME = "com.Tiger349x.hack.demo";
 
-// Initialize
-window.onload = function() {
-    checkAuthState();
-};
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Tiger Admin Panel Initializing...');
+    initApp();
+});
 
-// Authentication
+// Initialize the app
+function initApp() {
+    // Check if Firebase Auth is initialized
+    checkAuthState();
+    
+    // Setup event listeners
+    setupEventListeners();
+    
+    // Setup sidebar navigation
+    setupNavigation();
+}
+
+// Check Firebase Auth State
 function checkAuthState() {
-    auth.onAuthStateChanged((user) => {
-        if (user) {
-            currentUser = user;
-            document.getElementById('loginModal').style.display = 'none';
-            document.getElementById('dashboard').style.display = 'block';
-            document.getElementById('userEmail').textContent = user.email;
-            loadStats();
-            loadKeys();
-        } else {
-            const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
-            loginModal.show();
-        }
+    try {
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                // User is signed in
+                currentUser = user;
+                console.log('✅ User authenticated:', user.email);
+                
+                // Hide login, show dashboard
+                hideLoginModal();
+                showDashboard();
+                
+                // Update UI
+                document.getElementById('userEmail').textContent = user.email;
+                
+                // Load data
+                loadStats();
+                loadKeys();
+                
+                // Start session timer
+                startSessionTimer();
+                
+            } else {
+                // No user signed in
+                currentUser = null;
+                console.log('ℹ️ No user authenticated');
+                
+                // Show login, hide dashboard
+                showLoginModal();
+                hideDashboard();
+                
+                // Clear session timer
+                clearSessionTimer();
+            }
+        });
+    } catch (error) {
+        console.error('❌ Auth check error:', error);
+        showLoginModal();
+    }
+}
+
+// Setup Event Listeners
+function setupEventListeners() {
+    // Login form
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', handleLogin);
+    }
+    
+    // Password toggle
+    const toggleBtn = document.getElementById('togglePassword');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', togglePasswordVisibility);
+    }
+    
+    // Generate key form
+    const generateForm = document.getElementById('generateKeyForm');
+    if (generateForm) {
+        generateForm.addEventListener('submit', handleGenerateKeys);
+    }
+    
+    // Search and filters
+    const searchKey = document.getElementById('searchKey');
+    if (searchKey) {
+        searchKey.addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') loadKeys();
+        });
+    }
+    
+    const filterStatus = document.getElementById('filterStatus');
+    if (filterStatus) {
+        filterStatus.addEventListener('change', loadKeys);
+    }
+    
+    const filterType = document.getElementById('filterType');
+    if (filterType) {
+        filterType.addEventListener('change', loadKeys);
+    }
+}
+
+// Setup Navigation
+function setupNavigation() {
+    document.querySelectorAll('.list-group-item').forEach(item => {
+        item.addEventListener('click', function(e) {
+            e.preventDefault();
+            const section = this.dataset.section;
+            if (section) {
+                showSection(section);
+            }
+        });
     });
 }
 
-// Login handler
-// Add to admin.js - Enhanced key generation handler
+// Toggle Password Visibility
+function togglePasswordVisibility() {
+    const passwordInput = document.getElementById('password');
+    const icon = this.querySelector('i');
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        icon.className = 'bi bi-eye-slash';
+    } else {
+        passwordInput.type = 'password';
+        icon.className = 'bi bi-eye';
+    }
+}
 
-document.getElementById('generateKeyForm').addEventListener('submit', function(e) {
+// Handle Login
+function handleLogin(e) {
     e.preventDefault();
+    
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    
+    // Basic validation
+    if (!email) {
+        showLoginError('Please enter your email address');
+        return;
+    }
+    
+    if (!password) {
+        showLoginError('Please enter your password');
+        return;
+    }
+    
+    if (password.length < 6) {
+        showLoginError('Password must be at least 6 characters');
+        return;
+    }
+    
+    // Show loading state
+    showLoginLoading(true);
+    
+    // Attempt Firebase login
+    auth.signInWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+            console.log('✅ Login successful');
+            
+            // Clear form
+            document.getElementById('loginForm').reset();
+            
+            // Hide error
+            hideLoginError();
+            
+            // User state change will handle UI update
+            
+        })
+        .catch((error) => {
+            console.error('❌ Login failed:', error.code);
+            
+            let errorMessage = 'Login failed. Please try again.';
+            
+            switch (error.code) {
+                case 'auth/user-not-found':
+                    errorMessage = 'No account found with this email address';
+                    break;
+                case 'auth/wrong-password':
+                    errorMessage = 'Invalid password. Please try again';
+                    break;
+                case 'auth/invalid-email':
+                    errorMessage = 'Please enter a valid email address';
+                    break;
+                case 'auth/too-many-requests':
+                    errorMessage = 'Too many failed attempts. Please try again later';
+                    break;
+                case 'auth/user-disabled':
+                    errorMessage = 'This account has been disabled';
+                    break;
+                default:
+                    errorMessage = error.message;
+            }
+            
+            showLoginError(errorMessage);
+        })
+        .finally(() => {
+            showLoginLoading(false);
+        });
+}
+
+// Show login loading state
+function showLoginLoading(isLoading) {
+    const loginButton = document.getElementById('loginButton');
+    const loginSpinner = document.getElementById('loginSpinner');
+    
+    if (!loginButton || !loginSpinner) return;
+    
+    if (isLoading) {
+        loginButton.disabled = true;
+        loginSpinner.style.display = 'inline-block';
+        loginButton.innerHTML = `
+            <span class="spinner-border spinner-border-sm me-2"></span>
+            Signing in...
+        `;
+    } else {
+        loginButton.disabled = false;
+        loginSpinner.style.display = 'none';
+        loginButton.innerHTML = `
+            <i class="bi bi-box-arrow-in-right me-2"></i>Login
+        `;
+    }
+}
+
+// Show login error
+function showLoginError(message) {
+    const errorDiv = document.getElementById('loginError');
+    if (!errorDiv) return;
+    
+    errorDiv.innerHTML = `<i class="bi bi-exclamation-circle me-2"></i>${message}`;
+    errorDiv.style.display = 'block';
+    errorDiv.className = 'alert alert-danger';
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        errorDiv.style.display = 'none';
+    }, 5000);
+}
+
+// Hide login error
+function hideLoginError() {
+    const errorDiv = document.getElementById('loginError');
+    if (errorDiv) {
+        errorDiv.style.display = 'none';
+    }
+}
+
+// Show login modal
+function showLoginModal() {
+    const loginModal = document.getElementById('loginModal');
+    if (!loginModal) return;
+    
+    try {
+        const modal = new bootstrap.Modal(loginModal, {
+            backdrop: 'static',
+            keyboard: false
+        });
+        modal.show();
+    } catch (error) {
+        // Fallback
+        loginModal.style.display = 'block';
+        loginModal.classList.add('show');
+        document.body.classList.add('modal-open');
+    }
+}
+
+// Hide login modal
+function hideLoginModal() {
+    const loginModal = document.getElementById('loginModal');
+    if (!loginModal) return;
+    
+    try {
+        const modal = bootstrap.Modal.getInstance(loginModal);
+        if (modal) modal.hide();
+    } catch (error) {
+        // Fallback
+        loginModal.style.display = 'none';
+        loginModal.classList.remove('show');
+    }
+    
+    // Remove backdrop
+    const backdrop = document.querySelector('.modal-backdrop');
+    if (backdrop) backdrop.remove();
+    document.body.classList.remove('modal-open');
+}
+
+// Show dashboard
+function showDashboard() {
+    document.getElementById('dashboard').style.display = 'block';
+}
+
+// Hide dashboard
+function hideDashboard() {
+    document.getElementById('dashboard').style.display = 'none';
+}
+
+// Logout
+function logout() {
+    console.log('🚪 Logging out...');
+    
+    auth.signOut()
+        .then(() => {
+            console.log('✅ Logged out successfully');
+            currentUser = null;
+            clearSessionTimer();
+        })
+        .catch((error) => {
+            console.error('❌ Logout error:', error);
+            // Force logout
+            currentUser = null;
+            hideDashboard();
+            showLoginModal();
+        });
+}
+
+// Session Timer
+let sessionTimerInterval;
+
+function startSessionTimer() {
+    const sessionTimeout = 30 * 60 * 1000; // 30 minutes
+    let remainingTime = sessionTimeout;
+    
+    updateTimerDisplay(remainingTime);
+    
+    clearInterval(sessionTimerInterval);
+    
+    sessionTimerInterval = setInterval(() => {
+        remainingTime -= 1000;
+        updateTimerDisplay(remainingTime);
+        
+        if (remainingTime <= 0) {
+            handleSessionExpiry();
+        }
+    }, 1000);
+}
+
+function updateTimerDisplay(remainingTime) {
+    const timerDisplay = document.getElementById('timerDisplay');
+    if (!timerDisplay) return;
+    
+    const minutes = Math.floor(remainingTime / 60000);
+    const seconds = Math.floor((remainingTime % 60000) / 1000);
+    
+    timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    
+    // Update badge color
+    const sessionBadge = document.getElementById('sessionTimer');
+    if (sessionBadge) {
+        if (remainingTime <= 5 * 60 * 1000) {
+            sessionBadge.className = 'badge bg-danger';
+        } else if (remainingTime <= 10 * 60 * 1000) {
+            sessionBadge.className = 'badge bg-warning';
+        } else {
+            sessionBadge.className = 'badge bg-success';
+        }
+    }
+}
+
+function clearSessionTimer() {
+    clearInterval(sessionTimerInterval);
+    const timerDisplay = document.getElementById('timerDisplay');
+    if (timerDisplay) {
+        timerDisplay.textContent = '00:00';
+    }
+}
+
+function handleSessionExpiry() {
+    clearSessionTimer();
+    alert('Your session has expired. Please login again.');
+    logout();
+}
+
+// Navigation
+function showSection(section) {
+    console.log('📑 Switching to:', section);
+    
+    // Update sidebar
+    document.querySelectorAll('.list-group-item').forEach(item => {
+        item.classList.remove('active');
+        if (item.dataset.section === section) {
+            item.classList.add('active');
+        }
+    });
+    
+    // Hide all sections
+    document.querySelectorAll('.content-section').forEach(el => {
+        el.style.display = 'none';
+    });
+    
+    // Show selected section
+    const sectionMap = {
+        'keys': 'keysSection',
+        'generate': 'generateSection',
+        'stats': 'statsSection'
+    };
+    
+    const sectionId = sectionMap[section];
+    if (sectionId) {
+        const element = document.getElementById(sectionId);
+        if (element) {
+            element.style.display = 'block';
+        }
+    }
+    
+    // Load section data
+    if (section === 'keys') loadKeys();
+    if (section === 'stats') loadStats();
+}
+
+// Handle Generate Keys
+function handleGenerateKeys(e) {
+    e.preventDefault();
+    
+    if (!currentUser) {
+        showToast('Error', 'Please login first', 'danger');
+        return;
+    }
     
     const keyType = document.getElementById('keyType').value;
     const keyCount = parseInt(document.getElementById('keyCount').value);
-    const customPrefix = document.getElementById('keyPrefix').value || null;
+    const customPrefix = document.getElementById('keyPrefix').value || 'TIGER';
     
-    // Show loading state
-    const submitButton = this.querySelector('button[type="submit"]');
-    const originalText = submitButton.innerHTML;
-    submitButton.disabled = true;
-    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Generating...';
+    // Show loading
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalHTML = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generating...';
     
-    // Use the key generator
+    // Generate keys
     setTimeout(() => {
         try {
-            // Generate batch of keys
-            const generatedKeys = keyGenerator.generateBatchKeys(keyType, keyCount, customPrefix);
-            
-            // Create key objects for Firebase
-            const now = new Date().toISOString();
-            const keys = generatedKeys.map(keyData => ({
-                key: keyData.key,
-                type: keyData.type,
-                algorithm: keyData.algorithm,
-                status: 'active',
-                created: now,
-                expires: keyData.expires,
-                device: null,
-                packageName: keyGenerator.PACKAGE_NAME,
-                checksum: keyData.checksum,
-                createdAt: firebase.database.ServerValue.TIMESTAMP
-            }));
+            const keys = generateKeys(keyType, keyCount, customPrefix);
             
             // Save to Firebase
             const promises = keys.map(keyData => {
-                // Replace Firebase-unsafe characters in key path
                 const safeKey = keyData.key.replace(/[.#$/[\]]/g, '_');
-                const keyRef = database.ref('license_keys/' + safeKey);
-                return keyRef.set(keyData);
+                return database.ref('license_keys/' + safeKey).set(keyData);
             });
             
             Promise.all(promises)
                 .then(() => {
                     displayGeneratedKeys(keys);
                     loadStats();
-                    
-                    // Show success message
-                    showToast('Success', `Generated ${keys.length} license keys successfully!`, 'success');
-                    
-                    // Log generation event
-                    captchaManager.logSecurityEvent('keys_generated', 
-                        `Generated ${keyCount} ${keyType} keys with ${keyData.algorithm} algorithm`);
+                    showToast('Success', `Generated ${keys.length} keys successfully!`, 'success');
                 })
                 .catch(error => {
                     showToast('Error', 'Failed to save keys: ' + error.message, 'danger');
                 });
-                
+            
         } catch (error) {
-            showToast('Error', 'Key generation failed: ' + error.message, 'danger');
+            showToast('Error', 'Key generation failed', 'danger');
         } finally {
-            // Restore button
-            submitButton.disabled = false;
-            submitButton.innerHTML = originalText;
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalHTML;
         }
-    }, 500); // Small delay for better UX
-});
-
-// Display generated keys with enhanced view
-function displayGeneratedKeys(keys) {
-    const keysListDiv = document.getElementById('generatedKeysList');
-    
-    keysListDiv.innerHTML = `
-        <div class="table-responsive">
-            <table class="table table-sm table-bordered">
-                <thead class="table-light">
-                    <tr>
-                        <th>#</th>
-                        <th>License Key</th>
-                        <th>Type</th>
-                        <th>Algorithm</th>
-                        <th>Expiration</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${keys.map((key, index) => `
-                        <tr>
-                            <td>${index + 1}</td>
-                            <td>
-                                <code class="key-display">${key.key}</code>
-                                <button class="btn btn-sm btn-outline-secondary ms-2" 
-                                        onclick="copySingleKey('${key.key}')" 
-                                        title="Copy key">
-                                    <i class="bi bi-clipboard"></i>
-                                </button>
-                            </td>
-                            <td><span class="badge bg-info">${key.type}</span></td>
-                            <td><span class="badge bg-secondary">${key.algorithm || 'standard'}</span></td>
-                            <td>${key.expires === 'never' ? '<span class="badge bg-warning">Never</span>' : new Date(key.expires).toLocaleDateString()}</td>
-                            <td><span class="badge bg-success">${key.status}</span></td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        </div>
-        <div class="mt-2">
-            <small class="text-muted">
-                <i class="bi bi-info-circle"></i> 
-                Total keys generated: <strong>${keys.length}</strong> | 
-                Algorithm: <strong>${keys[0]?.algorithm || 'Standard'}</strong>
-            </small>
-        </div>
-    `;
-    
-    document.getElementById('generatedKeys').style.display = 'block';
-    
-    // Scroll to generated keys
-    document.getElementById('generatedKeys').scrollIntoView({ behavior: 'smooth' });
+    }, 500);
 }
 
-// Copy single key
-function copySingleKey(key) {
-    navigator.clipboard.writeText(key)
-        .then(() => {
-            showToast('Copied!', 'Key copied to clipboard', 'success');
-        })
-        .catch(() => {
-            showToast('Error', 'Failed to copy key', 'danger');
-        });
-}
-
-// Toast notification system
-function showToast(title, message, type = 'info') {
-    // Create toast container if it doesn't exist
-    let toastContainer = document.getElementById('toastContainer');
-    if (!toastContainer) {
-        toastContainer = document.createElement('div');
-        toastContainer.id = 'toastContainer';
-        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-        document.body.appendChild(toastContainer);
+// Generate license keys
+function generateKeys(type, count, prefix) {
+    const keys = [];
+    const now = new Date().toISOString();
+    
+    // Calculate expiration
+    let expirationDays = 0;
+    switch(type) {
+        case 'trial': expirationDays = 7; break;
+        case 'premium': expirationDays = 30; break;
+        case 'lifetime': expirationDays = 36500; break;
     }
     
-    const toastId = 'toast-' + Date.now();
-    const bgClass = type === 'success' ? 'bg-success' : 
-                    type === 'danger' ? 'bg-danger' : 
-                    type === 'warning' ? 'bg-warning' : 'bg-info';
+    const expirationDate = type === 'lifetime' ? 'never' : 
+        new Date(Date.now() + (expirationDays * 24 * 60 * 60 * 1000)).toISOString();
     
-    const toastHTML = `
-        <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="toast-header ${bgClass} text-white">
-                <strong class="me-auto">${title}</strong>
-                <small>${new Date().toLocaleTimeString()}</small>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
-            </div>
-            <div class="toast-body">
-                ${message}
-            </div>
-        </div>
-    `;
-    
-    toastContainer.insertAdjacentHTML('beforeend', toastHTML);
-    
-    const toastElement = document.getElementById(toastId);
-    const toast = new bootstrap.Toast(toastElement, {
-        delay: 5000,
-        autohide: true
-    });
-    toast.show();
-    
-    // Remove toast from DOM after hiding
-    toastElement.addEventListener('hidden.bs.toast', () => {
-        toastElement.remove();
-    });
-}
-
-// Enhanced copy all keys with options
-function copyAllKeys() {
-    const keyElements = document.querySelectorAll('#generatedKeysList code.key-display');
-    const keys = Array.from(keyElements).map(el => el.textContent);
-    
-    // Create formatted output
-    const formattedOutput = keys.map((key, index) => `${index + 1}. ${key}`).join('\n');
-    
-    navigator.clipboard.writeText(formattedOutput)
-        .then(() => showToast('Success', `${keys.length} keys copied to clipboard!`, 'success'))
-        .catch(() => showToast('Error', 'Failed to copy keys', 'danger'));
-}
-
-// Enhanced export function
-function exportKeys() {
-    const keyElements = document.querySelectorAll('#generatedKeysList code.key-display');
-    const keyData = Array.from(keyElements).map(el => {
-        const row = el.closest('tr');
-        const type = row.querySelector('.badge.bg-info')?.textContent || '';
-        const algorithm = row.querySelector('.badge.bg-secondary')?.textContent || '';
-        const expires = row.querySelector('td:nth-child(5)')?.textContent?.trim() || '';
-        
-        return {
-            key: el.textContent,
+    for (let i = 0; i < count; i++) {
+        const key = generateLicenseKey(prefix);
+        keys.push({
+            key: key,
             type: type,
-            algorithm: algorithm,
-            expires: expires
-        };
-    });
-    
-    // Show export options
-    const format = confirm('Click OK for CSV format, Cancel for Text format');
-    
-    let content, filename, mimeType;
-    
-    if (format) {
-        content = keyGenerator.exportToCSV(keyData);
-        filename = `tiger-keys-${Date.now()}.csv`;
-        mimeType = 'text/csv';
-    } else {
-        content = keyGenerator.exportToText(keyData);
-        filename = `tiger-keys-${Date.now()}.txt`;
-        mimeType = 'text/plain';
+            status: 'active',
+            created: now,
+            expires: expirationDate,
+            device: null,
+            packageName: PACKAGE_NAME,
+            createdAt: firebase.database.ServerValue.TIMESTAMP
+        });
     }
     
-    const blob = new Blob([content], { type: mimeType });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    window.URL.revokeObjectURL(url);
-    
-    showToast('Exported', `Keys exported as ${filename}`, 'success');
+    return keys;
 }
 
-// Logout
-function logout() {
-    auth.signOut();
-}
-
-// Navigation
-function showSection(section) {
-    document.querySelectorAll('.list-group-item').forEach(item => item.classList.remove('active'));
-    document.querySelectorAll('#keysSection, #generateSection, #statsSection').forEach(s => s.style.display = 'none');
-    
-    if (section === 'keys') {
-        document.getElementById('keysSection').style.display = 'block';
-        document.querySelector('.list-group-item:nth-child(1)').classList.add('active');
-    } else if (section === 'generate') {
-        document.getElementById('generateSection').style.display = 'block';
-        document.querySelector('.list-group-item:nth-child(2)').classList.add('active');
-    } else if (section === 'stats') {
-        document.getElementById('statsSection').style.display = 'block';
-        document.querySelector('.list-group-item:nth-child(3)').classList.add('active');
-        loadStats();
-    }
-}
-
-// Generate License Key
+// Generate single license key
 function generateLicenseKey(prefix = 'TIGER') {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     const segments = 4;
     const segmentLength = 4;
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     const keyParts = [];
     
     for (let i = 0; i < segments; i++) {
@@ -300,105 +513,53 @@ function generateLicenseKey(prefix = 'TIGER') {
     return `${prefix}-${keyParts.join('-')}`;
 }
 
-// Handle key generation form
-document.getElementById('generateKeyForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const keyType = document.getElementById('keyType').value;
-    const keyCount = parseInt(document.getElementById('keyCount').value);
-    const customPrefix = document.getElementById('keyPrefix').value || 'TIGER';
-    
-    const keys = [];
-    const now = Date.now();
-    
-    // Calculate expiration based on type
-    let expirationDays = 0;
-    if (keyType === 'trial') expirationDays = 7;
-    else if (keyType === 'premium') expirationDays = 30;
-    else if (keyType === 'lifetime') expirationDays = 36500; // ~100 years
-    
-    const expirationDate = keyType === 'lifetime' ? 'never' : new Date(now + (expirationDays * 24 * 60 * 60 * 1000));
-    
-    // Generate keys
-    for (let i = 0; i < keyCount; i++) {
-        const key = generateLicenseKey(customPrefix);
-        keys.push({
-            key: key,
-            type: keyType,
-            status: 'active',
-            created: new Date().toISOString(),
-            expires: expirationDate === 'never' ? 'never' : expirationDate.toISOString(),
-            device: null,
-            packageName: PACKAGE_NAME,
-            createdAt: firebase.database.ServerValue.TIMESTAMP
-        });
-    }
-    
-    // Save to Firebase
-    const promises = keys.map(keyData => {
-        const keyRef = database.ref('license_keys/' + keyData.key.replace(/[.#$/[\]]/g, '_'));
-        return keyRef.set(keyData);
-    });
-    
-    Promise.all(promises)
-        .then(() => {
-            displayGeneratedKeys(keys);
-            loadStats();
-        })
-        .catch(error => {
-            alert('Error generating keys: ' + error.message);
-        });
-});
-
 // Display generated keys
 function displayGeneratedKeys(keys) {
     const keysListDiv = document.getElementById('generatedKeysList');
-    keysListDiv.innerHTML = keys.map(k => 
-        `<div class="key-item bg-white p-2 mb-2 border rounded">
-            <strong>${k.key}</strong> - ${k.type} (Expires: ${k.expires})
-        </div>`
-    ).join('');
+    
+    keysListDiv.innerHTML = `
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>License Key</th>
+                        <th>Type</th>
+                        <th>Expiration</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${keys.map((key, index) => `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>
+                                <code class="key-display">${key.key}</code>
+                                <button class="btn btn-sm btn-outline-secondary ms-2" 
+                                        onclick="copySingleKey('${key.key}')">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </td>
+                            <td><span class="badge bg-info">${key.type}</span></td>
+                            <td>${key.expires === 'never' ? 'Never' : new Date(key.expires).toLocaleDateString()}</td>
+                            <td><span class="badge bg-success">${key.status}</span></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
     
     document.getElementById('generatedKeys').style.display = 'block';
 }
 
-// Copy all generated keys
-function copyAllKeys() {
-    const keyElements = document.querySelectorAll('#generatedKeysList .key-item strong');
-    const keysText = Array.from(keyElements).map(el => el.textContent).join('\n');
-    
-    navigator.clipboard.writeText(keysText)
-        .then(() => alert('Keys copied to clipboard!'))
-        .catch(() => alert('Failed to copy keys'));
-}
-
-// Export keys as CSV
-function exportKeys() {
-    const keyElements = document.querySelectorAll('#generatedKeysList .key-item');
-    let csv = 'License Key,Type,Expiration\n';
-    
-    keyElements.forEach(element => {
-        const text = element.textContent;
-        const match = text.match(/(.+) - (.+) \(Expires: (.+)\)/);
-        if (match) {
-            csv += `"${match[1]}","${match[2]}","${match[3]}"\n`;
-        }
-    });
-    
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `tiger-license-keys-${Date.now()}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-}
-
-// Load keys with filters
+// Load keys from Firebase
 function loadKeys() {
-    const searchTerm = document.getElementById('searchKey').value.toLowerCase();
-    const statusFilter = document.getElementById('filterStatus').value;
-    const typeFilter = document.getElementById('filterType').value;
+    if (!currentUser) return;
+    
+    const searchTerm = document.getElementById('searchKey')?.value?.toLowerCase() || '';
+    const statusFilter = document.getElementById('filterStatus')?.value || 'all';
+    const typeFilter = document.getElementById('filterType')?.value || 'all';
     
     database.ref('license_keys').once('value')
         .then(snapshot => {
@@ -416,6 +577,10 @@ function loadKeys() {
             });
             
             displayKeys(keys);
+        })
+        .catch(error => {
+            console.error('Error loading keys:', error);
+            showToast('Error', 'Failed to load keys', 'danger');
         });
 }
 
@@ -424,7 +589,7 @@ function displayKeys(keys) {
     const tbody = document.getElementById('keysTableBody');
     
     if (keys.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center">No keys found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No keys found</td></tr>';
         return;
     }
     
@@ -436,15 +601,15 @@ function displayKeys(keys) {
         
         return `
             <tr>
-                <td><code>${key.key}</code></td>
+                <td><code class="key-display">${key.key}</code></td>
                 <td><span class="badge bg-info">${key.type}</span></td>
                 <td><span class="badge ${statusBadge}">${key.status}</span></td>
                 <td>${created}</td>
                 <td>${expires}</td>
-                <td>${key.device || 'Not assigned'}</td>
+                <td><small class="text-muted">${key.device || 'Not assigned'}</small></td>
                 <td>
                     <button class="btn btn-sm btn-warning me-1" onclick="toggleKeyStatus('${key.keyId}', '${key.status}')">
-                        ${key.status === 'active' ? 'Deactivate' : 'Activate'}
+                        ${key.status === 'active' ? '<i class="bi bi-pause"></i>' : '<i class="bi bi-play"></i>'}
                     </button>
                     <button class="btn btn-sm btn-danger" onclick="deleteKey('${key.keyId}')">
                         <i class="bi bi-trash"></i>
@@ -464,28 +629,77 @@ function toggleKeyStatus(keyId, currentStatus) {
     }).then(() => {
         loadKeys();
         loadStats();
+        showToast('Success', `Key ${newStatus === 'active' ? 'activated' : 'deactivated'}`, 'success');
     });
 }
 
 // Delete key
 function deleteKey(keyId) {
-    if (confirm('Are you sure you want to delete this key?')) {
+    if (confirm('Are you sure you want to delete this key? This action cannot be undone.')) {
         database.ref('license_keys/' + keyId).remove()
             .then(() => {
                 loadKeys();
                 loadStats();
+                showToast('Deleted', 'Key deleted successfully', 'success');
+            })
+            .catch(error => {
+                showToast('Error', 'Failed to delete key', 'danger');
             });
     }
 }
 
+// Copy single key
+function copySingleKey(key) {
+    navigator.clipboard.writeText(key)
+        .then(() => showToast('Copied', 'Key copied to clipboard', 'success'))
+        .catch(() => showToast('Error', 'Failed to copy', 'danger'));
+}
+
+// Copy all generated keys
+function copyAllKeys() {
+    const keyElements = document.querySelectorAll('#generatedKeysList code.key-display');
+    const keysText = Array.from(keyElements).map(el => el.textContent).join('\n');
+    
+    navigator.clipboard.writeText(keysText)
+        .then(() => showToast('Copied', 'All keys copied to clipboard', 'success'))
+        .catch(() => showToast('Error', 'Failed to copy keys', 'danger'));
+}
+
+// Export keys as CSV
+function exportKeys() {
+    const keyElements = document.querySelectorAll('#generatedKeysList code.key-display');
+    const keys = Array.from(keyElements).map(el => {
+        const row = el.closest('tr');
+        return {
+            key: el.textContent,
+            type: row.querySelector('.badge')?.textContent || '',
+            expires: row.querySelector('td:nth-child(4)')?.textContent || ''
+        };
+    });
+    
+    let csv = 'License Key,Type,Expiration\n';
+    keys.forEach(k => {
+        csv += `"${k.key}","${k.type}","${k.expires}"\n`;
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tiger-keys-${Date.now()}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+    
+    showToast('Exported', 'Keys exported successfully', 'success');
+}
+
 // Load statistics
 function loadStats() {
+    if (!currentUser) return;
+    
     database.ref('license_keys').once('value')
         .then(snapshot => {
-            let total = 0;
-            let active = 0;
-            let trial = 0;
-            let premium = 0;
+            let total = 0, active = 0, trial = 0, premium = 0;
             
             snapshot.forEach(child => {
                 const key = child.val();
@@ -502,9 +716,46 @@ function loadStats() {
         });
 }
 
-// Auto refresh keys every 30 seconds
+// Toast notification
+function showToast(title, message, type = 'info') {
+    let toastContainer = document.getElementById('toastContainer');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toastContainer';
+        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        document.body.appendChild(toastContainer);
+    }
+    
+    const toastId = 'toast-' + Date.now();
+    const bgClass = type === 'success' ? 'bg-success' : 
+                   type === 'danger' ? 'bg-danger' : 
+                   type === 'warning' ? 'bg-warning' : 'bg-info';
+    
+    const toastHTML = `
+        <div id="${toastId}" class="toast" role="alert">
+            <div class="toast-header ${bgClass} text-white">
+                <strong class="me-auto">${title}</strong>
+                <small>${new Date().toLocaleTimeString()}</small>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body">${message}</div>
+        </div>
+    `;
+    
+    toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+    
+    const toastElement = document.getElementById(toastId);
+    const toast = new bootstrap.Toast(toastElement, { delay: 3000 });
+    toast.show();
+    
+    toastElement.addEventListener('hidden.bs.toast', () => toastElement.remove());
+}
+
+// Auto-refresh keys every 30 seconds
 setInterval(() => {
-    if (currentUser && document.getElementById('keysSection').style.display !== 'none') {
+    if (currentUser && document.getElementById('keysSection')?.style.display !== 'none') {
         loadKeys();
     }
 }, 30000);
+
+console.log('✅ Admin Panel JS Loaded');
