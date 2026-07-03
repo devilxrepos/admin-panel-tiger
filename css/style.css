@@ -1,0 +1,133 @@
+body {
+    background-color: #f5f5f5;
+}
+
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.5rem;
+}
+
+.key-item {
+    font-family: 'Courier New', monospace;
+    transition: all 0.3s;
+}
+
+.key-item:hover {
+    background-color: #e9ecef;
+    transform: translateX(5px);
+}
+
+code {
+    background-color: #f8f9fa;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: none;
+    margin-bottom: 20px;
+}
+
+.badge {
+    font-size: 0.85em;
+    padding: 5px 10px;
+}
+
+.table th {
+    background-color: #f8f9fa;
+    border-top: none;
+}
+
+.btn-sm {
+    padding: 2px 8px;
+}
+
+.modal-content {
+    border-radius: 10px;
+}
+
+#generatedKeysList {
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+}
+
+.list-group-item {
+    border: none;
+    margin-bottom: 5px;
+    border-radius: 5px !important;
+}
+
+.list-group-item.active {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+@media (max-width: 768px) {
+    .navbar-brand {
+        font-size: 1.2rem;
+    }
+    
+    .container-fluid {
+        padding: 10px;
+    }
+    
+/* Key Generator Styles */
+.key-display {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+    background: #f8f9fa;
+    padding: 3px 8px;
+    border-radius: 3px;
+    border: 1px solid #dee2e6;
+}
+
+.key-display:hover {
+    background: #e9ecef;
+}
+
+#generatedKeys .table {
+    font-size: 0.9em;
+}
+
+#generatedKeys .table td {
+    vertical-align: middle;
+}
+
+/* Toast notifications */
+.toast-container {
+    z-index: 9999;
+}
+
+.toast {
+    min-width: 300px;
+}
+
+/* Generation animation */
+@keyframes keyGeneration {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+#generatedKeys {
+    animation: keyGeneration 0.5s ease-out;
+}
+
+/* Key type badges */
+.badge-key-type {
+    padding: 5px 10px;
+    font-size: 0.85em;
+}
+
+/* Copy button animation */
+.copy-feedback {
+    animation: copyFeedback 1s ease-out;
+}
+
+@keyframes copyFeedback {
+    0% { background-color: #28a745; color: white; }
+    100% { background-color: transparent; color: inherit; }
+}
+}
