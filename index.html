@@ -5,209 +5,499 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tiger Admin Panel</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            background: #f5f5f5;
+            font-family: Arial, sans-serif;
+        }
+        .login-container {
+            max-width: 400px;
+            margin: 100px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .login-container h2 {
+            text-align: center;
+            margin-bottom: 25px;
+            color: #333;
+        }
+        .btn-login {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+        }
+        #errorMsg {
+            display: none;
+        }
+        .dashboard {
+            display: none;
+            padding: 20px;
+        }
+        .navbar {
+            margin-bottom: 20px;
+        }
+        .stats-card {
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .bg-blue { background: #2196F3; }
+        .bg-green { background: #4CAF50; }
+        .bg-orange { background: #FF9800; }
+        .bg-purple { background: #9C27B0; }
+        .key-item {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+        code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+    </style>
 </head>
 <body>
 
-    <!-- Login Page -->
-    <div id="loginPage" style="display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-        <div class="card shadow-lg" style="width: 400px; border-radius: 15px;">
-            <div class="card-body p-4">
-                <div class="text-center mb-4">
-                    <i class="bi bi-shield-lock-fill text-primary" style="font-size: 3rem;"></i>
-                    <h3 class="mt-2">Admin Login</h3>
-                    <p class="text-muted">Tiger License Manager</p>
+    <!-- LOGIN PAGE -->
+    <div id="loginPage">
+        <div class="login-container">
+            <h2>🔐 Admin Login</h2>
+            <div id="errorMsg" class="alert alert-danger"></div>
+            <form id="loginForm">
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-control" id="emailInput" placeholder="admin@example.com" required>
                 </div>
-                
-                <div id="loginError" class="alert alert-danger" style="display: none;"></div>
-                
-                <form id="loginForm">
-                    <div class="mb-3">
-                        <label class="form-label">Email</label>
-                        <input type="email" class="form-control" id="email" placeholder="admin@example.com" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Password</label>
-                        <input type="password" class="form-control" id="password" placeholder="Password" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100 py-2" id="loginButton">
-                        <i class="bi bi-box-arrow-in-right me-2"></i>Login
-                    </button>
-                </form>
-            </div>
+                <div class="mb-3">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-control" id="passwordInput" placeholder="Password" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-login" id="loginBtn">Login</button>
+            </form>
         </div>
     </div>
 
-    <!-- Dashboard -->
-    <div id="dashboardPage" style="display: none; min-height: 100vh; background: #f5f7fa;">
-        
-        <!-- Navbar -->
-        <nav class="navbar navbar-dark bg-dark px-3">
-            <span class="navbar-brand"><i class="bi bi-shield-lock-fill me-2"></i>Tiger Admin</span>
-            <div class="d-flex align-items-center">
-                <span class="text-white me-3" id="userEmail"></span>
-                <button class="btn btn-outline-light btn-sm" onclick="logout()">Logout</button>
+    <!-- DASHBOARD -->
+    <div id="dashboardPage" class="dashboard">
+        <nav class="navbar navbar-dark bg-dark rounded">
+            <div class="container-fluid">
+                <span class="navbar-brand">🐯 Tiger Admin Panel</span>
+                <span class="text-white me-3" id="userDisplay"></span>
+                <button class="btn btn-outline-light btn-sm" onclick="doLogout()">Logout</button>
             </div>
         </nav>
 
-        <div class="container-fluid mt-3">
-            <div class="row">
-                
-                <!-- Sidebar -->
-                <div class="col-md-2">
-                    <div class="list-group">
-                        <a href="#" class="list-group-item list-group-item-action active" data-page="keys">
-                            <i class="bi bi-key-fill me-2"></i>License Keys
-                        </a>
-                        <a href="#" class="list-group-item list-group-item-action" data-page="generate">
-                            <i class="bi bi-plus-circle-fill me-2"></i>Generate Keys
-                        </a>
-                        <a href="#" class="list-group-item list-group-item-action" data-page="stats">
-                            <i class="bi bi-graph-up me-2"></i>Statistics
-                        </a>
+        <div class="row">
+            <div class="col-md-3">
+                <div class="list-group mb-3">
+                    <a href="#" class="list-group-item list-group-item-action active" onclick="showTab('keys')">🔑 License Keys</a>
+                    <a href="#" class="list-group-item list-group-item-action" onclick="showTab('generate')">➕ Generate Keys</a>
+                    <a href="#" class="list-group-item list-group-item-action" onclick="showTab('stats')">📊 Statistics</a>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="stats-card bg-blue">
+                    <h4 id="statTotal">0</h4>
+                    <small>Total Keys</small>
+                </div>
+                <div class="stats-card bg-green">
+                    <h4 id="statActive">0</h4>
+                    <small>Active Keys</small>
+                </div>
+                <div class="stats-card bg-orange">
+                    <h4 id="statTrial">0</h4>
+                    <small>Trial Keys</small>
+                </div>
+                <div class="stats-card bg-purple">
+                    <h4 id="statPremium">0</h4>
+                    <small>Premium Keys</small>
+                </div>
+            </div>
+
+            <div class="col-md-9">
+                <!-- Keys Tab -->
+                <div id="tabKeys">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">All License Keys</h5>
+                            <button class="btn btn-outline-primary btn-sm" onclick="refreshKeys()">🔄 Refresh</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <input type="text" class="form-control" id="searchBox" placeholder="Search keys..." onkeyup="refreshKeys()">
+                            </div>
+                            <div id="keysContainer">
+                                <p class="text-center text-muted">Loading keys...</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Main Content -->
-                <div class="col-md-10">
-                    
-                    <!-- Keys Page -->
-                    <div id="pageKeys">
-                        <h3 class="mb-3">License Keys</h3>
-                        <div class="card">
-                            <div class="card-body">
+                <!-- Generate Tab -->
+                <div id="tabGenerate" style="display:none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Generate New License Keys</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="generateForm">
                                 <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <input type="text" class="form-control" id="searchKey" placeholder="Search keys...">
-                                    </div>
-                                    <div class="col-md-3">
-                                        <select class="form-select" id="filterType">
-                                            <option value="all">All Types</option>
-                                            <option value="trial">Trial</option>
-                                            <option value="premium">Premium</option>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Key Type</label>
+                                        <select class="form-select" id="keyTypeSelect">
+                                            <option value="trial">Trial (7 days)</option>
+                                            <option value="premium">Premium (30 days)</option>
                                             <option value="lifetime">Lifetime</option>
                                         </select>
                                     </div>
                                     <div class="col-md-3">
-                                        <button class="btn btn-primary w-100" onclick="loadKeys()">Search</button>
+                                        <label class="form-label">Quantity</label>
+                                        <input type="number" class="form-control" id="keyCountInput" value="1" min="1" max="100">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Prefix</label>
+                                        <input type="text" class="form-control" id="prefixInput" value="TIGER">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">&nbsp;</label>
+                                        <button type="submit" class="btn btn-success w-100">Generate</button>
                                     </div>
                                 </div>
-                                <div class="table-responsive">
-                                    <table class="table table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th>License Key</th>
-                                                <th>Type</th>
-                                                <th>Status</th>
-                                                <th>Created</th>
-                                                <th>Expires</th>
-                                                <th>Device</th>
-                                                <th>Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="keysTableBody">
-                                            <tr><td colspan="7" class="text-center py-4 text-muted">Loading...</td></tr>
-                                        </tbody>
-                                    </table>
-                                </div>
+                            </form>
+                            <div id="generatedKeysContainer" style="display:none;">
+                                <hr>
+                                <h6>Generated Keys:</h6>
+                                <div id="generatedKeysList"></div>
+                                <button class="btn btn-sm btn-outline-primary mt-2" onclick="copyGeneratedKeys()">📋 Copy All</button>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Generate Page -->
-                    <div id="pageGenerate" style="display: none;">
-                        <h3 class="mb-3">Generate License Keys</h3>
-                        <div class="card">
-                            <div class="card-body">
-                                <form id="generateForm">
-                                    <div class="row g-3">
-                                        <div class="col-md-4">
-                                            <label class="form-label">Key Type</label>
-                                            <select class="form-select" id="keyType">
-                                                <option value="trial">Trial (7 days)</option>
-                                                <option value="premium">Premium (30 days)</option>
-                                                <option value="lifetime">Lifetime</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <label class="form-label">Quantity</label>
-                                            <input type="number" class="form-control" id="keyCount" value="1" min="1" max="100">
-                                        </div>
-                                        <div class="col-md-3">
-                                            <label class="form-label">Prefix (optional)</label>
-                                            <input type="text" class="form-control" id="keyPrefix" placeholder="TIGER">
-                                        </div>
-                                        <div class="col-md-2">
-                                            <label class="form-label">&nbsp;</label>
-                                            <button type="submit" class="btn btn-success w-100">Generate</button>
-                                        </div>
-                                    </div>
-                                </form>
-                                <div id="generatedKeysBox" style="display: none;" class="mt-4">
-                                    <h5>Generated Keys:</h5>
-                                    <div id="generatedKeysList" class="bg-light p-3 rounded"></div>
-                                    <button class="btn btn-sm btn-outline-primary mt-2 me-2" onclick="copyAllKeys()">Copy All</button>
-                                    <button class="btn btn-sm btn-outline-success mt-2" onclick="exportKeys()">Export CSV</button>
-                                </div>
+                <!-- Stats Tab -->
+                <div id="tabStats" style="display:none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Key Type Distribution</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="statsDetail">
+                                <p class="text-center text-muted">Loading statistics...</p>
                             </div>
                         </div>
                     </div>
-
-                    <!-- Stats Page -->
-                    <div id="pageStats" style="display: none;">
-                        <h3 class="mb-3">Statistics</h3>
-                        <div class="row">
-                            <div class="col-md-3">
-                                <div class="card bg-primary text-white">
-                                    <div class="card-body text-center">
-                                        <h5>Total Keys</h5>
-                                        <h2 id="totalKeys">0</h2>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="card bg-success text-white">
-                                    <div class="card-body text-center">
-                                        <h5>Active Keys</h5>
-                                        <h2 id="activeKeys">0</h2>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="card bg-warning text-white">
-                                    <div class="card-body text-center">
-                                        <h5>Trial Keys</h5>
-                                        <h2 id="trialKeys">0</h2>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="card bg-info text-white">
-                                    <div class="card-body text-center">
-                                        <h5>Premium Keys</h5>
-                                        <h2 id="premiumKeys">0</h2>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Firebase -->
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
-    
-    <!-- Bootstrap -->
+
+    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <!-- Custom JS -->
-    <script src="js/firebase-config.js"></script>
-    <script src="js/admin.js"></script>
+
+    <script>
+        // ==========================================
+        // FIREBASE CONFIG
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyD4LsjVeocuVcZ3qZUi6j7tzz-1DKNtmtM",
+            authDomain: "mujahid-tiger.firebaseapp.com",
+            databaseURL: "https://mujahid-tiger-default-rtdb.firebaseio.com",
+            projectId: "mujahid-tiger",
+            storageBucket: "mujahid-tiger.firebasestorage.app",
+            messagingSenderId: "609986313885",
+            appId: "1:609986313885:web:d7a22ddaec17a040211e74"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const auth = firebase.auth();
+
+        console.log('✅ Firebase initialized');
+
+        // ==========================================
+        // AUTH STATE
+        // ==========================================
+        auth.onAuthStateChanged(function(user) {
+            if (user) {
+                console.log('✅ Logged in as:', user.email);
+                document.getElementById('loginPage').style.display = 'none';
+                document.getElementById('dashboardPage').style.display = 'block';
+                document.getElementById('userDisplay').textContent = user.email;
+                refreshKeys();
+                loadStats();
+            } else {
+                console.log('❌ Not logged in');
+                document.getElementById('loginPage').style.display = 'block';
+                document.getElementById('dashboardPage').style.display = 'none';
+            }
+        });
+
+        // ==========================================
+        // LOGIN
+        // ==========================================
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('emailInput').value.trim();
+            const password = document.getElementById('passwordInput').value;
+            const btn = document.getElementById('loginBtn');
+            const errorDiv = document.getElementById('errorMsg');
+            
+            errorDiv.style.display = 'none';
+            btn.disabled = true;
+            btn.textContent = 'Logging in...';
+            
+            console.log('Attempting login:', email);
+            
+            auth.signInWithEmailAndPassword(email, password)
+                .then(function(result) {
+                    console.log('✅ Login successful:', result.user.email);
+                    document.getElementById('loginForm').reset();
+                })
+                .catch(function(error) {
+                    console.error('❌ Login error:', error.code, error.message);
+                    errorDiv.style.display = 'block';
+                    errorDiv.textContent = 'Error: ' + error.message;
+                    btn.disabled = false;
+                    btn.textContent = 'Login';
+                });
+        });
+
+        // ==========================================
+        // LOGOUT
+        // ==========================================
+        function doLogout() {
+            auth.signOut().then(function() {
+                console.log('✅ Logged out');
+            });
+        }
+
+        // ==========================================
+        // TAB NAVIGATION
+        // ==========================================
+        function showTab(tab) {
+            document.getElementById('tabKeys').style.display = 'none';
+            document.getElementById('tabGenerate').style.display = 'none';
+            document.getElementById('tabStats').style.display = 'none';
+            
+            if (tab === 'keys') {
+                document.getElementById('tabKeys').style.display = 'block';
+                refreshKeys();
+            } else if (tab === 'generate') {
+                document.getElementById('tabGenerate').style.display = 'block';
+            } else if (tab === 'stats') {
+                document.getElementById('tabStats').style.display = 'block';
+                loadStats();
+            }
+            
+            // Update sidebar
+            document.querySelectorAll('.list-group-item').forEach(function(el, i) {
+                el.classList.remove('active');
+                if ((tab === 'keys' && i === 0) || (tab === 'generate' && i === 1) || (tab === 'stats' && i === 2)) {
+                    el.classList.add('active');
+                }
+            });
+        }
+
+        // ==========================================
+        // GENERATE KEYS
+        // ==========================================
+        document.getElementById('generateForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const user = auth.currentUser;
+            if (!user) {
+                alert('Please login first!');
+                return;
+            }
+            
+            const keyType = document.getElementById('keyTypeSelect').value;
+            const keyCount = parseInt(document.getElementById('keyCountInput').value) || 1;
+            const prefix = document.getElementById('prefixInput').value || 'TIGER';
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            const now = new Date().toISOString();
+            
+            let expDays = 7;
+            if (keyType === 'premium') expDays = 30;
+            if (keyType === 'lifetime') expDays = 36500;
+            
+            const expires = keyType === 'lifetime' ? 'never' : new Date(Date.now() + (expDays * 24 * 60 * 60 * 1000)).toISOString();
+            
+            const generatedKeys = [];
+            const promises = [];
+            
+            for (let i = 0; i < keyCount; i++) {
+                let key = prefix;
+                for (let s = 0; s < 4; s++) {
+                    key += '-';
+                    for (let c = 0; c < 4; c++) {
+                        key += chars.charAt(Math.floor(Math.random() * chars.length));
+                    }
+                }
+                generatedKeys.push(key);
+                
+                const safeKey = key.replace(/[.#$/[\]]/g, '_');
+                
+                const promise = database.ref('users/' + safeKey).set({
+                    key: key,
+                    type: keyType,
+                    status: 'active',
+                    created: now,
+                    expires: expires,
+                    device: '',
+                    packageName: 'com.Tiger349x.hack.demo',
+                    createdAt: firebase.database.ServerValue.TIMESTAMP
+                });
+                
+                promises.push(promise);
+            }
+            
+            Promise.all(promises)
+                .then(function() {
+                    let html = '';
+                    generatedKeys.forEach(function(k, idx) {
+                        html += '<div class="key-item">' + (idx + 1) + '. <code>' + k + '</code> <button class="btn btn-sm btn-outline-secondary float-end" onclick="copyKey(\'' + k + '\')">Copy</button></div>';
+                    });
+                    document.getElementById('generatedKeysList').innerHTML = html;
+                    document.getElementById('generatedKeysContainer').style.display = 'block';
+                    loadStats();
+                    alert('✅ Generated ' + generatedKeys.length + ' keys successfully!');
+                })
+                .catch(function(error) {
+                    alert('❌ Error: ' + error.message);
+                });
+        });
+
+        // ==========================================
+        // LOAD KEYS
+        // ==========================================
+        function refreshKeys() {
+            const container = document.getElementById('keysContainer');
+            const searchTerm = document.getElementById('searchBox')?.value?.toLowerCase() || '';
+            
+            container.innerHTML = '<p class="text-center text-muted">Loading...</p>';
+            
+            database.ref('users').once('value')
+                .then(function(snapshot) {
+                    const keys = [];
+                    
+                    snapshot.forEach(function(child) {
+                        const data = child.val();
+                        if (data.key) {
+                            data.id = child.key;
+                            if (!searchTerm || data.key.toLowerCase().includes(searchTerm)) {
+                                keys.push(data);
+                            }
+                        }
+                    });
+                    
+                    if (keys.length === 0) {
+                        container.innerHTML = '<p class="text-center text-muted">No keys found. Generate some!</p>';
+                        return;
+                    }
+                    
+                    let html = '<table class="table table-striped"><thead><tr><th>Key</th><th>Type</th><th>Status</th><th>Expires</th><th>Action</th></tr></thead><tbody>';
+                    
+                    keys.forEach(function(k) {
+                        const exp = !k.expires || k.expires === 'never' ? 'Never' : new Date(k.expires).toLocaleDateString();
+                        html += '<tr>';
+                        html += '<td><code>' + k.key + '</code></td>';
+                        html += '<td><span class="badge bg-info">' + (k.type || '?') + '</span></td>';
+                        html += '<td><span class="badge bg-success">' + (k.status || '?') + '</span></td>';
+                        html += '<td>' + exp + '</td>';
+                        html += '<td><button class="btn btn-sm btn-danger" onclick="deleteKey(\'' + k.id + '\')">Delete</button></td>';
+                        html += '</tr>';
+                    });
+                    
+                    html += '</tbody></table>';
+                    container.innerHTML = html;
+                })
+                .catch(function(error) {
+                    container.innerHTML = '<p class="text-danger">Error: ' + error.message + '</p>';
+                });
+        }
+
+        // ==========================================
+        // DELETE KEY
+        // ==========================================
+        function deleteKey(id) {
+            if (confirm('Delete this key?')) {
+                database.ref('users/' + id).remove()
+                    .then(function() {
+                        refreshKeys();
+                        loadStats();
+                    })
+                    .catch(function(error) {
+                        alert('Error: ' + error.message);
+                    });
+            }
+        }
+
+        // ==========================================
+        // LOAD STATS
+        // ==========================================
+        function loadStats() {
+            database.ref('users').once('value')
+                .then(function(snapshot) {
+                    let total = 0, active = 0, trial = 0, premium = 0;
+                    
+                    snapshot.forEach(function(child) {
+                        const data = child.val();
+                        if (data.key) {
+                            total++;
+                            if (data.status === 'active') active++;
+                            if (data.type === 'trial') trial++;
+                            if (data.type === 'premium' || data.type === 'lifetime') premium++;
+                        }
+                    });
+                    
+                    document.getElementById('statTotal').textContent = total;
+                    document.getElementById('statActive').textContent = active;
+                    document.getElementById('statTrial').textContent = trial;
+                    document.getElementById('statPremium').textContent = premium;
+                    
+                    document.getElementById('statsDetail').innerHTML = 
+                        '<p>Total Keys: <strong>' + total + '</strong></p>' +
+                        '<p>Active: <strong>' + active + '</strong></p>' +
+                        '<p>Inactive/Expired: <strong>' + (total - active) + '</strong></p>' +
+                        '<p>Trial: <strong>' + trial + '</strong></p>' +
+                        '<p>Premium/Lifetime: <strong>' + premium + '</strong></p>';
+                });
+        }
+
+        // ==========================================
+        // UTILITIES
+        // ==========================================
+        function copyKey(text) {
+            navigator.clipboard.writeText(text).then(function() {
+                alert('Copied!');
+            });
+        }
+
+        function copyGeneratedKeys() {
+            const keys = document.querySelectorAll('#generatedKeysList code');
+            let text = '';
+            keys.forEach(function(el, i) {
+                text += (i + 1) + '. ' + el.textContent + '\n';
+            });
+            navigator.clipboard.writeText(text).then(function() {
+                alert('Copied ' + keys.length + ' keys!');
+            });
+        }
+
+        console.log('✅ Admin panel ready');
+    </script>
 </body>
-  </html>
+</html>
