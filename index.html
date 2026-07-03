@@ -55,11 +55,16 @@
             margin: 5px 0;
             border-radius: 5px;
             font-family: monospace;
+            border: 1px solid #dee2e6;
         }
         code {
             background: #e9ecef;
             padding: 2px 6px;
             border-radius: 3px;
+            font-size: 13px;
+        }
+        .table td {
+            vertical-align: middle;
         }
     </style>
 </head>
@@ -68,7 +73,7 @@
     <!-- LOGIN PAGE -->
     <div id="loginPage">
         <div class="login-container">
-            <h2>🔐 Admin Login</h2>
+            <h2>&#128274; Admin Login</h2>
             <div id="errorMsg" class="alert alert-danger"></div>
             <form id="loginForm">
                 <div class="mb-3">
@@ -88,7 +93,7 @@
     <div id="dashboardPage" class="dashboard">
         <nav class="navbar navbar-dark bg-dark rounded">
             <div class="container-fluid">
-                <span class="navbar-brand">🐯 Tiger Admin Panel</span>
+                <span class="navbar-brand">&#128047; Tiger Admin Panel</span>
                 <span class="text-white me-3" id="userDisplay"></span>
                 <button class="btn btn-outline-light btn-sm" onclick="doLogout()">Logout</button>
             </div>
@@ -97,9 +102,9 @@
         <div class="row">
             <div class="col-md-3">
                 <div class="list-group mb-3">
-                    <a href="#" class="list-group-item list-group-item-action active" onclick="showTab('keys')">🔑 License Keys</a>
-                    <a href="#" class="list-group-item list-group-item-action" onclick="showTab('generate')">➕ Generate Keys</a>
-                    <a href="#" class="list-group-item list-group-item-action" onclick="showTab('stats')">📊 Statistics</a>
+                    <a href="#" class="list-group-item list-group-item-action active" onclick="showTab('keys')">&#128273; License Keys</a>
+                    <a href="#" class="list-group-item list-group-item-action" onclick="showTab('generate')">&#10133; Generate Keys</a>
+                    <a href="#" class="list-group-item list-group-item-action" onclick="showTab('stats')">&#128202; Statistics</a>
                 </div>
 
                 <!-- Stats Cards -->
@@ -126,8 +131,8 @@
                 <div id="tabKeys">
                     <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0">All License Keys</h5>
-                            <button class="btn btn-outline-primary btn-sm" onclick="refreshKeys()">🔄 Refresh</button>
+                            <h5 class="mb-0">All License Keys (users node)</h5>
+                            <button class="btn btn-outline-primary btn-sm" onclick="refreshKeys()">&#128260; Refresh</button>
                         </div>
                         <div class="card-body">
                             <div class="mb-3">
@@ -173,9 +178,10 @@
                             </form>
                             <div id="generatedKeysContainer" style="display:none;">
                                 <hr>
-                                <h6>Generated Keys:</h6>
+                                <h6>Generated Keys (Saved to users node):</h6>
                                 <div id="generatedKeysList"></div>
-                                <button class="btn btn-sm btn-outline-primary mt-2" onclick="copyGeneratedKeys()">📋 Copy All</button>
+                                <button class="btn btn-sm btn-outline-primary mt-2" onclick="copyGeneratedKeys()">&#128203; Copy All</button>
+                                <button class="btn btn-sm btn-outline-success mt-2 ms-1" onclick="exportCSV()">&#128229; Export CSV</button>
                             </div>
                         </div>
                     </div>
@@ -185,7 +191,7 @@
                 <div id="tabStats" style="display:none;">
                     <div class="card">
                         <div class="card-header">
-                            <h5 class="mb-0">Key Type Distribution</h5>
+                            <h5 class="mb-0">License Statistics</h5>
                         </div>
                         <div class="card-body">
                             <div id="statsDetail">
@@ -224,21 +230,21 @@
         const database = firebase.database();
         const auth = firebase.auth();
 
-        console.log('✅ Firebase initialized');
+        console.log('Firebase initialized');
 
         // ==========================================
         // AUTH STATE
         // ==========================================
         auth.onAuthStateChanged(function(user) {
             if (user) {
-                console.log('✅ Logged in as:', user.email);
+                console.log('Logged in as:', user.email);
                 document.getElementById('loginPage').style.display = 'none';
                 document.getElementById('dashboardPage').style.display = 'block';
                 document.getElementById('userDisplay').textContent = user.email;
                 refreshKeys();
                 loadStats();
             } else {
-                console.log('❌ Not logged in');
+                console.log('Not logged in');
                 document.getElementById('loginPage').style.display = 'block';
                 document.getElementById('dashboardPage').style.display = 'none';
             }
@@ -259,15 +265,13 @@
             btn.disabled = true;
             btn.textContent = 'Logging in...';
             
-            console.log('Attempting login:', email);
-            
             auth.signInWithEmailAndPassword(email, password)
                 .then(function(result) {
-                    console.log('✅ Login successful:', result.user.email);
+                    console.log('Login success:', result.user.email);
                     document.getElementById('loginForm').reset();
                 })
                 .catch(function(error) {
-                    console.error('❌ Login error:', error.code, error.message);
+                    console.error('Login error:', error.message);
                     errorDiv.style.display = 'block';
                     errorDiv.textContent = 'Error: ' + error.message;
                     btn.disabled = false;
@@ -280,7 +284,7 @@
         // ==========================================
         function doLogout() {
             auth.signOut().then(function() {
-                console.log('✅ Logged out');
+                console.log('Logged out');
             });
         }
 
@@ -302,7 +306,6 @@
                 loadStats();
             }
             
-            // Update sidebar
             document.querySelectorAll('.list-group-item').forEach(function(el, i) {
                 el.classList.remove('active');
                 if ((tab === 'keys' && i === 0) || (tab === 'generate' && i === 1) || (tab === 'stats' && i === 2)) {
@@ -312,7 +315,7 @@
         }
 
         // ==========================================
-        // GENERATE KEYS
+        // GENERATE KEYS - FIXED FOR ANDROID APP
         // ==========================================
         document.getElementById('generateForm').addEventListener('submit', function(e) {
             e.preventDefault();
@@ -339,6 +342,7 @@
             const promises = [];
             
             for (let i = 0; i < keyCount; i++) {
+                // Generate random key
                 let key = prefix;
                 for (let s = 0; s < 4; s++) {
                     key += '-';
@@ -348,15 +352,23 @@
                 }
                 generatedKeys.push(key);
                 
+                // Clean key for Firebase path
                 const safeKey = key.replace(/[.#$/[\]]/g, '_');
                 
+                // SAVE WITH EXACT FIELDS YOUR ANDROID APP EXPECTS
+                // Based on smali code: GotKey, GotUid, GotExp, GotKenb, IsRes, DEVICE, GotUid2
                 const promise = database.ref('users/' + safeKey).set({
                     key: key,
+                    uid: key,
+                    exp: expires,
+                    kenb: key,
+                    isRes: 'false',
+                    device: '',
+                    uid2: '',
                     type: keyType,
                     status: 'active',
                     created: now,
                     expires: expires,
-                    device: '',
                     packageName: 'com.Tiger349x.hack.demo',
                     createdAt: firebase.database.ServerValue.TIMESTAMP
                 });
@@ -366,28 +378,34 @@
             
             Promise.all(promises)
                 .then(function() {
+                    // Display generated keys
                     let html = '';
                     generatedKeys.forEach(function(k, idx) {
-                        html += '<div class="key-item">' + (idx + 1) + '. <code>' + k + '</code> <button class="btn btn-sm btn-outline-secondary float-end" onclick="copyKey(\'' + k + '\')">Copy</button></div>';
+                        html += '<div class="key-item">';
+                        html += '<strong>' + (idx + 1) + '.</strong> ';
+                        html += '<code>' + k + '</code> ';
+                        html += '<button class="btn btn-sm btn-outline-secondary float-end" onclick="copyKey(\'' + k.replace(/'/g, "\\'") + '\')">Copy</button>';
+                        html += '</div>';
                     });
                     document.getElementById('generatedKeysList').innerHTML = html;
                     document.getElementById('generatedKeysContainer').style.display = 'block';
                     loadStats();
-                    alert('✅ Generated ' + generatedKeys.length + ' keys successfully!');
+                    alert('Success! Generated ' + generatedKeys.length + ' keys.\n\nSaved to: users node\nReady for Android app!');
                 })
                 .catch(function(error) {
-                    alert('❌ Error: ' + error.message);
+                    console.error('Save error:', error);
+                    alert('Error saving keys: ' + error.message + '\n\nCheck Firebase Database Rules!');
                 });
         });
 
         // ==========================================
-        // LOAD KEYS
+        // LOAD KEYS - FIXED
         // ==========================================
         function refreshKeys() {
             const container = document.getElementById('keysContainer');
             const searchTerm = document.getElementById('searchBox')?.value?.toLowerCase() || '';
             
-            container.innerHTML = '<p class="text-center text-muted">Loading...</p>';
+            container.innerHTML = '<p class="text-center text-muted">Loading keys from users node...</p>';
             
             database.ref('users').once('value')
                 .then(function(snapshot) {
@@ -395,37 +413,58 @@
                     
                     snapshot.forEach(function(child) {
                         const data = child.val();
-                        if (data.key) {
+                        
+                        // Accept data with either key or kenb field
+                        if (data.key || data.kenb) {
                             data.id = child.key;
-                            if (!searchTerm || data.key.toLowerCase().includes(searchTerm)) {
-                                keys.push(data);
-                            }
+                            
+                            // Normalize fields
+                            if (!data.key) data.key = data.kenb || '';
+                            if (!data.type) data.type = 'unknown';
+                            if (!data.status) data.status = 'active';
+                            if (!data.expires) data.expires = data.exp || '';
+                            if (!data.device) data.device = '';
+                            if (!data.created) data.created = '';
+                            
+                            // Apply search filter
+                            if (searchTerm && !data.key.toLowerCase().includes(searchTerm)) return;
+                            
+                            keys.push(data);
                         }
                     });
                     
                     if (keys.length === 0) {
-                        container.innerHTML = '<p class="text-center text-muted">No keys found. Generate some!</p>';
+                        container.innerHTML = '<p class="text-center text-muted">No keys found in users node. Generate some keys!</p>';
                         return;
                     }
                     
-                    let html = '<table class="table table-striped"><thead><tr><th>Key</th><th>Type</th><th>Status</th><th>Expires</th><th>Action</th></tr></thead><tbody>';
+                    let html = '<div class="table-responsive"><table class="table table-striped table-hover">';
+                    html += '<thead><tr><th>License Key</th><th>Type</th><th>Status</th><th>Expires</th><th>Device</th><th>Action</th></tr></thead><tbody>';
                     
                     keys.forEach(function(k) {
                         const exp = !k.expires || k.expires === 'never' ? 'Never' : new Date(k.expires).toLocaleDateString();
+                        const device = k.device || 'Not assigned';
+                        const statusBadge = k.status === 'active' ? 'bg-success' : k.status === 'inactive' ? 'bg-warning' : 'bg-danger';
+                        const typeBadge = k.type === 'trial' ? 'bg-info' : k.type === 'premium' ? 'bg-primary' : 'bg-success';
+                        
                         html += '<tr>';
                         html += '<td><code>' + k.key + '</code></td>';
-                        html += '<td><span class="badge bg-info">' + (k.type || '?') + '</span></td>';
-                        html += '<td><span class="badge bg-success">' + (k.status || '?') + '</span></td>';
+                        html += '<td><span class="badge ' + typeBadge + '">' + k.type + '</span></td>';
+                        html += '<td><span class="badge ' + statusBadge + '">' + k.status + '</span></td>';
                         html += '<td>' + exp + '</td>';
+                        html += '<td><small>' + device + '</small></td>';
                         html += '<td><button class="btn btn-sm btn-danger" onclick="deleteKey(\'' + k.id + '\')">Delete</button></td>';
                         html += '</tr>';
                     });
                     
-                    html += '</tbody></table>';
+                    html += '</tbody></table></div>';
+                    html += '<small class="text-muted">Total: ' + keys.length + ' keys</small>';
+                    
                     container.innerHTML = html;
                 })
                 .catch(function(error) {
-                    container.innerHTML = '<p class="text-danger">Error: ' + error.message + '</p>';
+                    console.error('Load error:', error);
+                    container.innerHTML = '<div class="alert alert-danger">Error loading keys: ' + error.message + '<br><small>Check Firebase Database Rules (set to allow read/write)</small></div>';
                 });
         }
 
@@ -433,14 +472,15 @@
         // DELETE KEY
         // ==========================================
         function deleteKey(id) {
-            if (confirm('Delete this key?')) {
+            if (confirm('Are you sure you want to delete this key? This cannot be undone.')) {
                 database.ref('users/' + id).remove()
                     .then(function() {
+                        console.log('Deleted:', id);
                         refreshKeys();
                         loadStats();
                     })
                     .catch(function(error) {
-                        alert('Error: ' + error.message);
+                        alert('Error deleting: ' + error.message);
                     });
             }
         }
@@ -451,53 +491,95 @@
         function loadStats() {
             database.ref('users').once('value')
                 .then(function(snapshot) {
-                    let total = 0, active = 0, trial = 0, premium = 0;
+                    let total = 0, active = 0, inactive = 0, trial = 0, premium = 0, lifetime = 0;
                     
                     snapshot.forEach(function(child) {
                         const data = child.val();
-                        if (data.key) {
+                        if (data.key || data.kenb) {
                             total++;
                             if (data.status === 'active') active++;
+                            else inactive++;
                             if (data.type === 'trial') trial++;
-                            if (data.type === 'premium' || data.type === 'lifetime') premium++;
+                            else if (data.type === 'premium') premium++;
+                            else if (data.type === 'lifetime') lifetime++;
                         }
                     });
                     
                     document.getElementById('statTotal').textContent = total;
                     document.getElementById('statActive').textContent = active;
                     document.getElementById('statTrial').textContent = trial;
-                    document.getElementById('statPremium').textContent = premium;
+                    document.getElementById('statPremium').textContent = premium + lifetime;
                     
                     document.getElementById('statsDetail').innerHTML = 
-                        '<p>Total Keys: <strong>' + total + '</strong></p>' +
-                        '<p>Active: <strong>' + active + '</strong></p>' +
-                        '<p>Inactive/Expired: <strong>' + (total - active) + '</strong></p>' +
-                        '<p>Trial: <strong>' + trial + '</strong></p>' +
-                        '<p>Premium/Lifetime: <strong>' + premium + '</strong></p>';
+                        '<div class="row">' +
+                        '<div class="col-6"><p>Total Keys: <strong>' + total + '</strong></p></div>' +
+                        '<div class="col-6"><p>Active: <strong>' + active + '</strong></p></div>' +
+                        '<div class="col-6"><p>Inactive/Expired: <strong>' + inactive + '</strong></p></div>' +
+                        '<div class="col-6"><p>Trial: <strong>' + trial + '</strong></p></div>' +
+                        '<div class="col-6"><p>Premium: <strong>' + premium + '</strong></p></div>' +
+                        '<div class="col-6"><p>Lifetime: <strong>' + lifetime + '</strong></p></div>' +
+                        '</div>';
+                })
+                .catch(function(error) {
+                    console.error('Stats error:', error);
                 });
         }
 
         // ==========================================
-        // UTILITIES
+        // UTILITY FUNCTIONS
         // ==========================================
         function copyKey(text) {
             navigator.clipboard.writeText(text).then(function() {
-                alert('Copied!');
+                alert('Copied: ' + text);
+            }).catch(function() {
+                prompt('Copy this key:', text);
             });
         }
 
         function copyGeneratedKeys() {
-            const keys = document.querySelectorAll('#generatedKeysList code');
+            const keyElements = document.querySelectorAll('#generatedKeysList code');
+            if (keyElements.length === 0) {
+                alert('No keys to copy!');
+                return;
+            }
+            
             let text = '';
-            keys.forEach(function(el, i) {
+            keyElements.forEach(function(el, i) {
                 text += (i + 1) + '. ' + el.textContent + '\n';
             });
+            
             navigator.clipboard.writeText(text).then(function() {
-                alert('Copied ' + keys.length + ' keys!');
+                alert('Copied ' + keyElements.length + ' keys to clipboard!');
+            }).catch(function() {
+                prompt('Copy keys:', text);
             });
         }
 
-        console.log('✅ Admin panel ready');
+        function exportCSV() {
+            const keyElements = document.querySelectorAll('#generatedKeysList code');
+            if (keyElements.length === 0) {
+                alert('No keys to export!');
+                return;
+            }
+            
+            let csv = 'License Key\n';
+            keyElements.forEach(function(el) {
+                csv += '"' + el.textContent + '"\n';
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'tiger-keys-' + new Date().toISOString().slice(0, 10) + '.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        console.log('Admin panel ready - Saving to users node');
+        console.log('Fields: key, uid, exp, kenb, isRes, device, uid2');
     </script>
 </body>
 </html>
