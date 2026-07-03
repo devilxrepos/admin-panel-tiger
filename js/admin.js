@@ -1,11 +1,13 @@
 /**
  * Tiger Admin Panel - Main JavaScript
- * Simple Login System
+ * License Key Management System
+ * Saves to "users" node to match Android app
  */
 
 // Global variables
 let currentUser = null;
 const PACKAGE_NAME = "com.Tiger349x.hack.demo";
+const DB_NODE = "users"; // Changed from "license_keys" to "users" to match app
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
@@ -171,7 +173,6 @@ function handleLogin(e) {
             hideLoginError();
             
             // User state change will handle UI update
-            
         })
         .catch((error) => {
             console.error('❌ Login failed:', error.code);
@@ -437,29 +438,86 @@ function handleGenerateKeys(e) {
         try {
             const keys = generateKeys(keyType, keyCount, customPrefix);
             
-            // Save to Firebase
-            const promises = keys.map(keyData => {
-                const safeKey = keyData.key.replace(/[.#$/[\]]/g, '_');
-                return database.ref('license_keys/' + safeKey).set(keyData);
-            });
-            
-            Promise.all(promises)
+            // Save to Firebase "users" node (matching Android app)
+            saveKeysToDatabase(keys)
                 .then(() => {
                     displayGeneratedKeys(keys);
                     loadStats();
-                    showToast('Success', `Generated ${keys.length} keys successfully!`, 'success');
+                    showToast('Success', `Generated and saved ${keys.length} keys!`, 'success');
                 })
                 .catch(error => {
-                    showToast('Error', 'Failed to save keys: ' + error.message, 'danger');
+                    console.error('Save error:', error);
+                    showToast('Error', 'Failed to save: ' + error.message, 'danger');
+                    // Still display keys even if save failed
+                    displayGeneratedKeys(keys);
                 });
             
         } catch (error) {
+            console.error('Generation error:', error);
             showToast('Error', 'Key generation failed', 'danger');
         } finally {
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalHTML;
         }
     }, 500);
+}
+
+// Save keys to Firebase Database
+function saveKeysToDatabase(keys) {
+    console.log(`💾 Saving ${keys.length} keys to Firebase "${DB_NODE}" node...`);
+    
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        return Promise.reject(new Error('Not authenticated'));
+    }
+    
+    console.log('✅ User authenticated:', user.email);
+    
+    const promises = keys.map((keyData, index) => {
+        // Clean key for Firebase path
+        const safeKey = keyData.key.replace(/[.#$/[\]]/g, '_');
+        
+        // Create data structure matching Android app expectations
+        const appData = {
+            // Standard fields
+            key: keyData.key,
+            type: keyData.type,
+            status: keyData.status,
+            created: keyData.created,
+            expires: keyData.expires,
+            device: keyData.device || '',
+            packageName: keyData.packageName,
+            createdAt: firebase.database.ServerValue.TIMESTAMP,
+            
+            // Fields matching Android app (from smali code)
+            uid: keyData.key,           // GotUid
+            exp: keyData.expires,       // GotExp
+            kenb: keyData.key,          // GotKenb
+            keyNumber: keyData.key,     // GotKenb alternative
+            deviceId: keyData.device || '',  // DEVICE
+            isRes: 'false',             // IsRes
+            uid2: ''                    // GotUid2
+        };
+        
+        console.log(`📝 Saving key ${index + 1}/${keys.length}: ${keyData.key}`);
+        
+        // Save to users node (where your app looks)
+        return database.ref(DB_NODE + '/' + safeKey).set(appData)
+            .then(() => {
+                console.log(`✅ Key ${index + 1} saved successfully`);
+                return true;
+            })
+            .catch((error) => {
+                console.error(`❌ Failed to save key ${index + 1}:`, error);
+                
+                if (error.code === 'PERMISSION_DENIED') {
+                    throw new Error('Permission denied. Update Firebase Database Rules to allow write access.');
+                }
+                throw error;
+            });
+    });
+    
+    return Promise.all(promises);
 }
 
 // Generate license keys
@@ -473,13 +531,27 @@ function generateKeys(type, count, prefix) {
         case 'trial': expirationDays = 7; break;
         case 'premium': expirationDays = 30; break;
         case 'lifetime': expirationDays = 36500; break;
+        default: expirationDays = 7;
     }
     
     const expirationDate = type === 'lifetime' ? 'never' : 
         new Date(Date.now() + (expirationDays * 24 * 60 * 60 * 1000)).toISOString();
     
+    // Generate unique keys
+    const generatedKeySet = new Set();
+    
     for (let i = 0; i < count; i++) {
-        const key = generateLicenseKey(prefix);
+        let key;
+        let attempts = 0;
+        
+        // Try to generate unique key
+        do {
+            key = generateLicenseKey(prefix);
+            attempts++;
+        } while (generatedKeySet.has(key) && attempts < 100);
+        
+        generatedKeySet.add(key);
+        
         keys.push({
             key: key,
             type: type,
@@ -487,8 +559,7 @@ function generateKeys(type, count, prefix) {
             created: now,
             expires: expirationDate,
             device: null,
-            packageName: PACKAGE_NAME,
-            createdAt: firebase.database.ServerValue.TIMESTAMP
+            packageName: PACKAGE_NAME
         });
     }
     
@@ -502,10 +573,21 @@ function generateLicenseKey(prefix = 'TIGER') {
     const segmentLength = 4;
     const keyParts = [];
     
+    // Use crypto for better randomness if available
+    const getRandomChar = () => {
+        if (window.crypto && window.crypto.getRandomValues) {
+            const array = new Uint32Array(1);
+            window.crypto.getRandomValues(array);
+            return chars[array[0] % chars.length];
+        } else {
+            return chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+    };
+    
     for (let i = 0; i < segments; i++) {
         let segment = '';
         for (let j = 0; j < segmentLength; j++) {
-            segment += chars.charAt(Math.floor(Math.random() * chars.length));
+            segment += getRandomChar();
         }
         keyParts.push(segment);
     }
@@ -517,9 +599,15 @@ function generateLicenseKey(prefix = 'TIGER') {
 function displayGeneratedKeys(keys) {
     const keysListDiv = document.getElementById('generatedKeysList');
     
+    if (!keys || keys.length === 0) {
+        keysListDiv.innerHTML = '<p class="text-center text-muted">No keys generated</p>';
+        document.getElementById('generatedKeys').style.display = 'block';
+        return;
+    }
+    
     keysListDiv.innerHTML = `
         <div class="table-responsive">
-            <table class="table table-sm table-bordered">
+            <table class="table table-sm table-bordered mb-0">
                 <thead class="table-light">
                     <tr>
                         <th>#</th>
@@ -527,153 +615,82 @@ function displayGeneratedKeys(keys) {
                         <th>Type</th>
                         <th>Expiration</th>
                         <th>Status</th>
+                        <th>Copy</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${keys.map((key, index) => `
                         <tr>
-                            <td>${index + 1}</td>
+                            <td class="text-center">${index + 1}</td>
                             <td>
                                 <code class="key-display">${key.key}</code>
-                                <button class="btn btn-sm btn-outline-secondary ms-2" 
-                                        onclick="copySingleKey('${key.key}')">
+                            </td>
+                            <td><span class="badge bg-info">${key.type}</span></td>
+                            <td>${key.expires === 'never' ? '<span class="badge bg-warning">Never</span>' : new Date(key.expires).toLocaleDateString()}</td>
+                            <td><span class="badge bg-success">${key.status}</span></td>
+                            <td class="text-center">
+                                <button class="btn btn-sm btn-outline-secondary" 
+                                        onclick="copySingleKey('${key.key.replace(/'/g, "\\'")}')" 
+                                        title="Copy key">
                                     <i class="bi bi-clipboard"></i>
                                 </button>
                             </td>
-                            <td><span class="badge bg-info">${key.type}</span></td>
-                            <td>${key.expires === 'never' ? 'Never' : new Date(key.expires).toLocaleDateString()}</td>
-                            <td><span class="badge bg-success">${key.status}</span></td>
                         </tr>
                     `).join('')}
                 </tbody>
             </table>
         </div>
+        <div class="mt-2 text-muted small">
+            <i class="bi bi-info-circle"></i> 
+            Total: <strong>${keys.length}</strong> keys | 
+            Saved to: <strong>${DB_NODE}</strong> node
+        </div>
     `;
     
     document.getElementById('generatedKeys').style.display = 'block';
-}
-
-// Load keys from Firebase
-function loadKeys() {
-    if (!currentUser) return;
     
-    const searchTerm = document.getElementById('searchKey')?.value?.toLowerCase() || '';
-    const statusFilter = document.getElementById('filterStatus')?.value || 'all';
-    const typeFilter = document.getElementById('filterType')?.value || 'all';
-    
-    database.ref('license_keys').once('value')
-        .then(snapshot => {
-            const keys = [];
-            snapshot.forEach(child => {
-                const keyData = child.val();
-                keyData.keyId = child.key;
-                
-                // Apply filters
-                if (searchTerm && !keyData.key.toLowerCase().includes(searchTerm)) return;
-                if (statusFilter !== 'all' && keyData.status !== statusFilter) return;
-                if (typeFilter !== 'all' && keyData.type !== typeFilter) return;
-                
-                keys.push(keyData);
-            });
-            
-            displayKeys(keys);
-        })
-        .catch(error => {
-            console.error('Error loading keys:', error);
-            showToast('Error', 'Failed to load keys', 'danger');
-        });
-}
-
-// Display keys in table
-function displayKeys(keys) {
-    const tbody = document.getElementById('keysTableBody');
-    
-    if (keys.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No keys found</td></tr>';
-        return;
-    }
-    
-    tbody.innerHTML = keys.map(key => {
-        const created = new Date(key.created).toLocaleDateString();
-        const expires = key.expires === 'never' ? 'Never' : new Date(key.expires).toLocaleDateString();
-        const statusBadge = key.status === 'active' ? 'bg-success' : 
-                           key.status === 'inactive' ? 'bg-warning' : 'bg-danger';
-        
-        return `
-            <tr>
-                <td><code class="key-display">${key.key}</code></td>
-                <td><span class="badge bg-info">${key.type}</span></td>
-                <td><span class="badge ${statusBadge}">${key.status}</span></td>
-                <td>${created}</td>
-                <td>${expires}</td>
-                <td><small class="text-muted">${key.device || 'Not assigned'}</small></td>
-                <td>
-                    <button class="btn btn-sm btn-warning me-1" onclick="toggleKeyStatus('${key.keyId}', '${key.status}')">
-                        ${key.status === 'active' ? '<i class="bi bi-pause"></i>' : '<i class="bi bi-play"></i>'}
-                    </button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteKey('${key.keyId}')">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </td>
-            </tr>
-        `;
-    }).join('');
-}
-
-// Toggle key status
-function toggleKeyStatus(keyId, currentStatus) {
-    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
-    
-    database.ref('license_keys/' + keyId).update({
-        status: newStatus
-    }).then(() => {
-        loadKeys();
-        loadStats();
-        showToast('Success', `Key ${newStatus === 'active' ? 'activated' : 'deactivated'}`, 'success');
-    });
-}
-
-// Delete key
-function deleteKey(keyId) {
-    if (confirm('Are you sure you want to delete this key? This action cannot be undone.')) {
-        database.ref('license_keys/' + keyId).remove()
-            .then(() => {
-                loadKeys();
-                loadStats();
-                showToast('Deleted', 'Key deleted successfully', 'success');
-            })
-            .catch(error => {
-                showToast('Error', 'Failed to delete key', 'danger');
-            });
-    }
+    // Scroll to generated keys
+    document.getElementById('generatedKeys').scrollIntoView({ behavior: 'smooth' });
 }
 
 // Copy single key
 function copySingleKey(key) {
     navigator.clipboard.writeText(key)
-        .then(() => showToast('Copied', 'Key copied to clipboard', 'success'))
-        .catch(() => showToast('Error', 'Failed to copy', 'danger'));
+        .then(() => showToast('Copied!', 'Key copied to clipboard', 'success'))
+        .catch(() => showToast('Error', 'Failed to copy key', 'danger'));
 }
 
 // Copy all generated keys
 function copyAllKeys() {
     const keyElements = document.querySelectorAll('#generatedKeysList code.key-display');
-    const keysText = Array.from(keyElements).map(el => el.textContent).join('\n');
+    if (keyElements.length === 0) {
+        showToast('Error', 'No keys to copy', 'danger');
+        return;
+    }
+    
+    const keysText = Array.from(keyElements)
+        .map((el, i) => `${i + 1}. ${el.textContent}`)
+        .join('\n');
     
     navigator.clipboard.writeText(keysText)
-        .then(() => showToast('Copied', 'All keys copied to clipboard', 'success'))
+        .then(() => showToast('Copied!', `${keyElements.length} keys copied to clipboard`, 'success'))
         .catch(() => showToast('Error', 'Failed to copy keys', 'danger'));
 }
 
 // Export keys as CSV
 function exportKeys() {
     const keyElements = document.querySelectorAll('#generatedKeysList code.key-display');
+    if (keyElements.length === 0) {
+        showToast('Error', 'No keys to export', 'danger');
+        return;
+    }
+    
     const keys = Array.from(keyElements).map(el => {
         const row = el.closest('tr');
         return {
             key: el.textContent,
-            type: row.querySelector('.badge')?.textContent || '',
-            expires: row.querySelector('td:nth-child(4)')?.textContent || ''
+            type: row.querySelector('.badge')?.textContent?.trim() || '',
+            expires: row.querySelector('td:nth-child(4)')?.textContent?.trim() || ''
         };
     });
     
@@ -682,37 +699,280 @@ function exportKeys() {
         csv += `"${k.key}","${k.type}","${k.expires}"\n`;
     });
     
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `tiger-keys-${Date.now()}.csv`;
+    a.download = `tiger-license-keys-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
     
-    showToast('Exported', 'Keys exported successfully', 'success');
+    showToast('Exported', `Keys exported as CSV`, 'success');
+}
+
+// Load keys from Firebase
+function loadKeys() {
+    if (!currentUser) {
+        console.log('⚠️ Cannot load keys: Not authenticated');
+        return;
+    }
+    
+    console.log(`📥 Loading keys from "${DB_NODE}" node...`);
+    
+    const searchTerm = document.getElementById('searchKey')?.value?.toLowerCase() || '';
+    const statusFilter = document.getElementById('filterStatus')?.value || 'all';
+    const typeFilter = document.getElementById('filterType')?.value || 'all';
+    
+    // Show loading in table
+    const tbody = document.getElementById('keysTableBody');
+    if (tbody) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center py-4">
+                    <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+                    Loading keys from database...
+                </td>
+            </tr>
+        `;
+    }
+    
+    database.ref(DB_NODE).once('value')
+        .then(snapshot => {
+            const keys = [];
+            
+            snapshot.forEach(child => {
+                const keyData = child.val();
+                
+                // Skip non-key entries (like metadata)
+                if (!keyData.key && !keyData.kenb) return;
+                
+                keyData.keyId = child.key;
+                
+                // Map fields to match expected structure
+                if (!keyData.key && keyData.kenb) {
+                    keyData.key = keyData.kenb;
+                }
+                if (!keyData.expires && keyData.exp) {
+                    keyData.expires = keyData.exp;
+                }
+                if (!keyData.status) {
+                    keyData.status = 'active';
+                }
+                if (!keyData.type) {
+                    keyData.type = 'unknown';
+                }
+                
+                // Apply filters
+                if (searchTerm && !keyData.key?.toLowerCase().includes(searchTerm)) return;
+                if (statusFilter !== 'all' && keyData.status !== statusFilter) return;
+                if (typeFilter !== 'all' && keyData.type !== typeFilter) return;
+                
+                keys.push(keyData);
+            });
+            
+            // Sort by creation date (newest first)
+            keys.sort((a, b) => {
+                const dateA = a.createdAt || a.created || 0;
+                const dateB = b.createdAt || b.created || 0;
+                return dateB - dateA;
+            });
+            
+            console.log(`✅ Loaded ${keys.length} keys`);
+            displayKeys(keys);
+        })
+        .catch(error => {
+            console.error('❌ Error loading keys:', error);
+            
+            if (tbody) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-danger">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            Error loading keys: ${error.message}
+                            <br>
+                            <small>Check Firebase Database Rules and connection</small>
+                        </td>
+                    </tr>
+                `;
+            }
+            
+            showToast('Error', 'Failed to load keys: ' + error.message, 'danger');
+        });
+}
+
+// Display keys in table
+function displayKeys(keys) {
+    const tbody = document.getElementById('keysTableBody');
+    
+    if (!tbody) return;
+    
+    if (keys.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center py-4 text-muted">
+                    <i class="bi bi-inbox display-4 d-block mb-2"></i>
+                    No license keys found
+                    <br>
+                    <small>Generate new keys or adjust your filters</small>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = keys.map(key => {
+        const created = key.created ? new Date(key.created).toLocaleDateString() : 'Unknown';
+        const expires = !key.expires || key.expires === 'never' ? 
+            '<span class="badge bg-warning">Never</span>' : 
+            new Date(key.expires).toLocaleDateString();
+        
+        const statusClass = key.status === 'active' ? 'bg-success' : 
+                           key.status === 'inactive' ? 'bg-warning text-dark' : 'bg-danger';
+        
+        const typeClass = key.type === 'trial' ? 'bg-info' :
+                         key.type === 'premium' ? 'bg-primary' :
+                         key.type === 'lifetime' ? 'bg-success' : 'bg-secondary';
+        
+        return `
+            <tr>
+                <td>
+                    <code class="key-display" title="${key.key}">${key.key}</code>
+                    <button class="btn btn-sm btn-outline-secondary ms-1" 
+                            onclick="copySingleKey('${(key.key || '').replace(/'/g, "\\'")}')"
+                            title="Copy">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                </td>
+                <td><span class="badge ${typeClass}">${key.type || 'unknown'}</span></td>
+                <td><span class="badge ${statusClass}">${key.status || 'unknown'}</span></td>
+                <td>${created}</td>
+                <td>${expires}</td>
+                <td>
+                    <small class="text-muted" title="${key.device || key.deviceId || ''}">
+                        ${key.device || key.deviceId ? 
+                            (key.device || key.deviceId).substring(0, 8) + '...' : 
+                            'Not assigned'}
+                    </small>
+                </td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-warning" 
+                                onclick="toggleKeyStatus('${key.keyId}', '${key.status || 'active'}')"
+                                title="${key.status === 'active' ? 'Deactivate' : 'Activate'}">
+                            <i class="bi bi-${key.status === 'active' ? 'pause' : 'play'}"></i>
+                        </button>
+                        <button class="btn btn-outline-danger" 
+                                onclick="deleteKey('${key.keyId}')"
+                                title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    // Update key count
+    const keysCount = document.getElementById('keysCount');
+    if (keysCount) {
+        keysCount.textContent = `Showing ${keys.length} key(s)`;
+    }
+}
+
+// Toggle key status
+function toggleKeyStatus(keyId, currentStatus) {
+    if (!currentUser) {
+        showToast('Error', 'Please login first', 'danger');
+        return;
+    }
+    
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    const action = newStatus === 'active' ? 'activate' : 'deactivate';
+    
+    if (!confirm(`Are you sure you want to ${action} this key?`)) {
+        return;
+    }
+    
+    database.ref(DB_NODE + '/' + keyId).update({
+        status: newStatus
+    })
+    .then(() => {
+        loadKeys();
+        loadStats();
+        showToast('Success', `Key ${action}d successfully`, 'success');
+    })
+    .catch(error => {
+        console.error('Error toggling status:', error);
+        showToast('Error', 'Failed to update key: ' + error.message, 'danger');
+    });
+}
+
+// Delete key
+function deleteKey(keyId) {
+    if (!currentUser) {
+        showToast('Error', 'Please login first', 'danger');
+        return;
+    }
+    
+    if (!confirm('Are you sure you want to delete this key? This action cannot be undone.')) {
+        return;
+    }
+    
+    database.ref(DB_NODE + '/' + keyId).remove()
+        .then(() => {
+            loadKeys();
+            loadStats();
+            showToast('Deleted', 'Key deleted successfully', 'success');
+        })
+        .catch(error => {
+            console.error('Error deleting key:', error);
+            showToast('Error', 'Failed to delete key: ' + error.message, 'danger');
+        });
 }
 
 // Load statistics
 function loadStats() {
     if (!currentUser) return;
     
-    database.ref('license_keys').once('value')
+    console.log('📊 Loading statistics...');
+    
+    database.ref(DB_NODE).once('value')
         .then(snapshot => {
-            let total = 0, active = 0, trial = 0, premium = 0;
+            let total = 0, active = 0, inactive = 0, expired = 0;
+            let trial = 0, premium = 0, lifetime = 0, unknown = 0;
             
             snapshot.forEach(child => {
                 const key = child.val();
+                
+                // Skip non-key entries
+                if (!key.key && !key.kenb) return;
+                
                 total++;
+                
+                // Count by status
                 if (key.status === 'active') active++;
+                else if (key.status === 'inactive') inactive++;
+                else if (key.status === 'expired') expired++;
+                
+                // Count by type
                 if (key.type === 'trial') trial++;
-                if (key.type === 'premium' || key.type === 'lifetime') premium++;
+                else if (key.type === 'premium') premium++;
+                else if (key.type === 'lifetime') lifetime++;
+                else unknown++;
             });
             
+            // Update UI
             document.getElementById('totalKeys').textContent = total;
             document.getElementById('activeKeys').textContent = active;
             document.getElementById('trialKeys').textContent = trial;
-            document.getElementById('premiumKeys').textContent = premium;
+            document.getElementById('premiumKeys').textContent = premium + lifetime;
+            
+            console.log(`✅ Stats loaded: ${total} total, ${active} active`);
+        })
+        .catch(error => {
+            console.error('Error loading stats:', error);
         });
 }
 
@@ -731,31 +991,63 @@ function showToast(title, message, type = 'info') {
                    type === 'danger' ? 'bg-danger' : 
                    type === 'warning' ? 'bg-warning' : 'bg-info';
     
+    const iconClass = type === 'success' ? 'bi-check-circle' :
+                     type === 'danger' ? 'bi-x-circle' :
+                     type === 'warning' ? 'bi-exclamation-triangle' : 'bi-info-circle';
+    
     const toastHTML = `
-        <div id="${toastId}" class="toast" role="alert">
+        <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="toast-header ${bgClass} text-white">
+                <i class="bi ${iconClass} me-2"></i>
                 <strong class="me-auto">${title}</strong>
                 <small>${new Date().toLocaleTimeString()}</small>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
-            <div class="toast-body">${message}</div>
+            <div class="toast-body">
+                ${message}
+            </div>
         </div>
     `;
     
     toastContainer.insertAdjacentHTML('beforeend', toastHTML);
     
     const toastElement = document.getElementById(toastId);
-    const toast = new bootstrap.Toast(toastElement, { delay: 3000 });
+    const toast = new bootstrap.Toast(toastElement, { 
+        delay: 3000,
+        autohide: true 
+    });
     toast.show();
     
-    toastElement.addEventListener('hidden.bs.toast', () => toastElement.remove());
+    // Remove from DOM after hidden
+    toastElement.addEventListener('hidden.bs.toast', () => {
+        toastElement.remove();
+    });
 }
 
 // Auto-refresh keys every 30 seconds
-setInterval(() => {
-    if (currentUser && document.getElementById('keysSection')?.style.display !== 'none') {
-        loadKeys();
-    }
-}, 30000);
+let autoRefreshInterval;
 
-console.log('✅ Admin Panel JS Loaded');
+function startAutoRefresh() {
+    autoRefreshInterval = setInterval(() => {
+        if (currentUser && document.getElementById('keysSection')?.style.display !== 'none') {
+            loadKeys();
+        }
+    }, 30000);
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+    }
+}
+
+// Initialize auto-refresh
+startAutoRefresh();
+
+// Clean up on page unload
+window.addEventListener('beforeunload', () => {
+    stopAutoRefresh();
+    clearSessionTimer();
+});
+
+console.log('✅ Admin Panel JS Loaded - Using "' + DB_NODE + '" database node');
